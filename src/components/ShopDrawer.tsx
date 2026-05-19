@@ -122,7 +122,7 @@ export default function ShopDrawer({ open, onClose }: { open: boolean; onClose: 
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
         </div>
 
-        <div style={{ display: 'flex', gap: 6, padding: '0 16px 10px', overflowX: 'auto', flexShrink: 0 }} className="no-scroll">
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 16px 10px', flexShrink: 0 }}>
           {TABS.map(t => {
             const active = tab === t.id;
             const highlight = t.highlight;
@@ -131,8 +131,8 @@ export default function ShopDrawer({ open, onClose }: { open: boolean; onClose: 
                 key={t.id}
                 onClick={() => setTab(t.id)}
                 style={{
-                  flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5,
-                  padding: '6px 12px', borderRadius: 999, cursor: 'pointer',
+                  flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4,
+                  padding: '6px 10px', borderRadius: 999, cursor: 'pointer',
                   fontSize: 12, fontWeight: 800,
                   background: active
                     ? highlight ? 'linear-gradient(135deg,#b45309,#92400e)' : '#16a34a'
