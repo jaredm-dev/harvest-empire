@@ -161,15 +161,16 @@ function MissionsBtn({ onClick, active, readyCount }: {
       style={{ position: 'relative' }}
     >
       <span style={{
-        fontSize: 22, lineHeight: 1, display: 'block',
-        marginBottom: 2,
+        width: 26, height: 26,
+        display: 'grid', placeItems: 'center',
+        fontSize: 18, lineHeight: 1,
       }} aria-hidden="true">📅</span>
       <span className="tool-label">Missions</span>
       {readyCount > 0 && (
         <span
           className="mission-badge-ready"
           style={{
-            position: 'absolute', top: 4, right: 8,
+            position: 'absolute', top: 2, right: 4,
             background: '#16a34a', color: 'white',
             fontSize: 10, fontWeight: 900,
             padding: '2px 6px', borderRadius: 10,
