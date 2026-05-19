@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useGameStore } from '../store';
 import { formatMoney } from '../utils/format';
 
@@ -10,18 +10,27 @@ interface FloatingNum {
 }
 
 let nextId = 0;
+const MIN_DIFF = 5; // ignore sub-$5 changes to keep it clean
 
-// Listens to money changes and emits floating "+$X" texts at random positions
+// Subscribes to the zustand store directly (NOT a useStore hook) so this
+// component does not re-render on every tick. Only updates when a money
+// jump actually emits a floating number.
 export default function FloatingNumbers() {
-  const money = useGameStore(s => s.money);
-  const prev = useRef(money);
   const [floats, setFloats] = useState<FloatingNum[]>([]);
 
   useEffect(() => {
-    const diff = money - prev.current;
-    prev.current = money;
-    if (diff > 0 && diff < 10_000_000) {
-      // Add a floating number near top-center of screen
+    let prev = useGameStore.getState().money;
+    let lastEmit = 0;
+
+    const unsub = useGameStore.subscribe((state) => {
+      const m = state.money;
+      const diff = m - prev;
+      prev = m;
+      if (diff <= MIN_DIFF || diff > 10_000_000) return;
+      const now = Date.now();
+      // Throttle to avoid spamming the screen
+      if (now - lastEmit < 250) return;
+      lastEmit = now;
       const id = `fn-${nextId++}`;
       const x = window.innerWidth / 2 + (Math.random() * 200 - 100);
       const y = 100 + Math.random() * 40;
@@ -29,8 +38,12 @@ export default function FloatingNumbers() {
       setTimeout(() => {
         setFloats(f => f.filter(n => n.id !== id));
       }, 1500);
-    }
-  }, [money]);
+    });
+
+    return unsub;
+  }, []);
+
+  if (floats.length === 0) return null;
 
   return (
     <div style={{

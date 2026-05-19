@@ -15,7 +15,7 @@ export default function HUD({ onPrestige }: Props) {
   const gems = useGameStore(s => s.gems ?? 0);
   const totalEarned = useGameStore(s => s.totalEarned);
   const prestigeLevel = useGameStore(s => s.prestigeLevel);
-  const activeEvents = useGameStore(s => s.activeEvents ?? []);
+  const activeEvents = useGameStore(s => s.activeEvents) ?? [];
 
   const [display, setDisplay] = useState(money);
   const [pop, setPop] = useState(false);

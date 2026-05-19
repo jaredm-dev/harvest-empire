@@ -23,7 +23,14 @@ export default function App() {
   const applyOfflineProgress = useGameStore(s => s.applyOfflineProgress);
   const refreshDailyMissions = useGameStore(s => s.refreshDailyMissions);
   const hasSeenTutorial = useGameStore(s => s.hasSeenTutorial);
-  const dailyMissions = useGameStore(s => s.dailyMissions || []);
+  // Select just the count as a number — stable equality, no re-render on every tick
+  const readyMissionCount = useGameStore(s => {
+    const missions = s.dailyMissions;
+    if (!missions || missions.length === 0) return 0;
+    let count = 0;
+    for (const m of missions) if (!m.claimed && m.progress >= m.target) count++;
+    return count;
+  });
 
   const lastTime = useRef(performance.now());
   const rafRef = useRef(0);
@@ -80,8 +87,6 @@ export default function App() {
   }, [tick]);
 
   const close = () => setModal('none');
-
-  const readyMissionCount = dailyMissions.filter(m => !m.claimed && m.progress >= m.target).length;
 
   return (
     <div className="phone-shell">

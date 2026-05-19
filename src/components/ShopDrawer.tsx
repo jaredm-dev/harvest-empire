@@ -148,7 +148,7 @@ export default function ShopDrawer({ open, onClose }: { open: boolean; onClose: 
           })}
         </div>
 
-        <div className="drawer-scroll" style={{ padding: '0 16px 24px' }}>
+        <div className="drawer-scroll" style={{ padding: '0 16px 100px' }}>
           {tab === 'fields' && (
             <>
               <p style={{ color: '#94a3b8', fontSize: 11, marginBottom: 10 }}>More fields grow more crops, but every field can develop problems and needs upkeep.</p>

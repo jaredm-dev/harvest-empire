@@ -32,7 +32,7 @@ export function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () 
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 22, cursor: 'pointer' }}>×</button>
         </div>
 
-        <div className="drawer-scroll" style={{ padding: '0 16px 24px' }}>
+        <div className="drawer-scroll" style={{ padding: '0 16px 100px' }}>
           {/* Capacity bar */}
           <div style={{ background: '#0f172a', borderRadius: 12, padding: '12px 14px', marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -154,7 +154,7 @@ export function MarketDrawer({ open, onClose }: { open: boolean; onClose: () => 
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 22, cursor: 'pointer' }}>×</button>
         </div>
 
-        <div className="drawer-scroll" style={{ padding: '0 16px 24px' }}>
+        <div className="drawer-scroll" style={{ padding: '0 16px 100px' }}>
           <div style={{ background: '#0f172a', borderRadius: 12, padding: '14px', marginBottom: 12 }}>
             <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6 }}>TOTAL EARNINGS</div>
             <div style={{ color: '#fbbf24', fontSize: 28, fontWeight: 800 }}>
@@ -230,7 +230,7 @@ export function MarketDrawer({ open, onClose }: { open: boolean; onClose: () => 
 // ── Harvester assign ──────────────────────────────────────────────────────────
 function MarketOrderBoard() {
   const inventory = useGameStore(s => s.inventory);
-  const orders = useGameStore(s => s.marketOrders ?? []);
+  const orders = useGameStore(s => s.marketOrders) ?? [];
   const completeMarketOrder = useGameStore(s => s.completeMarketOrder);
   const rerollMarketOrders = useGameStore(s => s.rerollMarketOrders);
 
@@ -346,7 +346,7 @@ export function AssignDrawer({
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 22, cursor: 'pointer' }}>×</button>
         </div>
 
-        <div className="drawer-scroll" style={{ padding: '0 16px 24px' }}>
+        <div className="drawer-scroll" style={{ padding: '0 16px 100px' }}>
           {/* Crop picker */}
           <p style={{ color: '#475569', fontSize: 11, marginBottom: 8 }}>FIELD CONDITION</p>
           <div style={{ background: '#0f172a', borderRadius: 12, padding: '12px 14px', marginBottom: 14 }}>

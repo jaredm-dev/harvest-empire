@@ -2,7 +2,7 @@ import { useGameStore } from '../store';
 import { formatMoney, formatNumber } from '../utils/format';
 
 export default function MissionsDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const missions = useGameStore(s => s.dailyMissions || []);
+  const missions = useGameStore(s => s.dailyMissions) || [];
   const claimMissionReward = useGameStore(s => s.claimMissionReward);
 
   return (
@@ -19,7 +19,7 @@ export default function MissionsDrawer({ open, onClose }: { open: boolean; onClo
           Complete missions to earn gems and cash. Resets every 24 hours.
         </p>
 
-        <div className="drawer-scroll" style={{ padding: '0 16px 24px' }}>
+        <div className="drawer-scroll" style={{ padding: '0 16px 100px' }}>
           {missions.length === 0 ? (
             <p style={{ color: '#94a3b8', fontSize: 12, textAlign: 'center', padding: 24 }}>
               No missions yet — come back tomorrow!
