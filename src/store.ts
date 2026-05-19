@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { GameStore, Field, Harvester, Warehouse, Truck, CropType, FieldIssue, Toast, FieldCart, MarketOrder, GameEvent, EventType } from './types';
+import type { GameStore, Field, Harvester, Warehouse, Truck, CropType, FieldIssue, Toast, FieldCart, MarketOrder, GameEvent, EventType, DailyMission } from './types';
 import {
   CROP_CONFIG, FIELD_CONFIG, HARVESTER_CONFIG, WAREHOUSE_CONFIG, TRUCK_CONFIG,
   PRESTIGE_CONFIG, IAP_ITEMS, MAX_FIELDS, UPGRADE_CONFIG, getPrestigeMultiplier,
-  ACHIEVEMENT_CONFIG, EVENT_CONFIG,
+  ACHIEVEMENT_CONFIG, EVENT_CONFIG, MISSION_POOL,
 } from './config';
+import { formatMoney } from './utils/format';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -71,6 +72,31 @@ const INITIAL_WAREHOUSES: Warehouse[] = [{
   type: 'stand',
 }];
 
+const generateDailyMissions = (): DailyMission[] => {
+  // Pick 3 random unique missions
+  const shuffled = [...MISSION_POOL].sort(() => Math.random() - 0.5);
+  const picks: DailyMission[] = [];
+  const usedTypes = new Set<string>();
+  for (const m of shuffled) {
+    if (picks.length >= 3) break;
+    // Avoid duplicate types in same set
+    if (usedTypes.has(m.type)) continue;
+    usedTypes.add(m.type);
+    picks.push({
+      id: uid(),
+      type: m.type,
+      target: m.target,
+      progress: 0,
+      rewardGems: m.rewardGems,
+      rewardMoney: m.rewardMoney,
+      claimed: false,
+      description: m.description,
+      emoji: m.emoji,
+    });
+  }
+  return picks;
+};
+
 const INITIAL_STATE = {
   money: 500,
   gems: 25,
@@ -91,6 +117,29 @@ const INITIAL_STATE = {
   loginStreak: 0,
   lastLoginDate: null as string | null,
   marketOrdersCompleted: 0,
+  // New fields
+  lastSavedTime: null as number | null,
+  dailyMissions: [] as DailyMission[],
+  missionsDate: null as string | null,
+  hasFirstPurchase: false,
+  hasSeenTutorial: false,
+  offlineReport: null as null | { seconds: number; moneyEarned: number; cropsGrown: number },
+  totalCropsHarvested: 0,
+  totalDeliveriesCompleted: 0,
+};
+
+// Helper to update mission progress
+const bumpMissions = (
+  missions: DailyMission[],
+  type: DailyMission['type'],
+  amount: number,
+): DailyMission[] => {
+  if (!missions || missions.length === 0) return missions;
+  return missions.map(m =>
+    m.type === type && !m.claimed
+      ? { ...m, progress: Math.min(m.target, m.progress + amount) }
+      : m,
+  );
 };
 
 export const useGameStore = create<GameStore>()(
@@ -263,7 +312,7 @@ export const useGameStore = create<GameStore>()(
                 earned += (amt || 0) * cc.baseValue * tc.valueMultiplier * pm * marketBonus * eventDeliveryMult;
               }
               moneyEarned += earned;
-              newToasts.push({ id: uid(), message: `Delivery complete! +$${Math.floor(earned).toLocaleString()}`, type: 'success' });
+              newToasts.push({ id: uid(), message: `Delivery complete! +${formatMoney(earned)}`, type: 'success' });
               return { ...truck, status: 'returning' as const, deliveryProgress: 0 };
             }
             return { ...truck, deliveryProgress: newProg };
@@ -322,20 +371,32 @@ export const useGameStore = create<GameStore>()(
           .map(e => ({ ...e, duration: e.duration - delta }))
           .filter(e => e.duration > 0);
 
-        set(s => ({
-          fields: finalFields,
-          fieldCarts: updatedCarts,
-          trucks: updatedTrucks,
-          inventory: newInventory,
-          money: s.money + moneyEarned,
-          totalEarned: s.totalEarned + moneyEarned,
-          achievements: newAchievements.length ? [...new Set([...(s.achievements || []), ...newAchievements])] : (s.achievements || []),
-          activeEvents: updatedEvents,
-          marketOrders: (s.marketOrders?.length ? s.marketOrders : generateMarketOrders(s.unlockedCrops, s.prestigeLevel))
-            .map(order => ({ ...order, expiresIn: Math.max(0, order.expiresIn - delta) }))
-            .map(order => order.expiresIn <= 0 ? generateMarketOrders(s.unlockedCrops, s.prestigeLevel)[0] : order),
-          toasts: [...s.toasts, ...newToasts].slice(-5),
-        }));
+        // Count truck deliveries that completed this tick (newToasts containing "Delivery complete")
+        const deliveriesThisTick = newToasts.filter(t => t.message.startsWith('Delivery complete')).length;
+
+        set(s => {
+          let missions = s.dailyMissions || [];
+          if (moneyEarned > 0)         missions = bumpMissions(missions, 'earn_money', moneyEarned);
+          if (deliveriesThisTick > 0)  missions = bumpMissions(missions, 'use_truck', deliveriesThisTick);
+
+          return {
+            fields: finalFields,
+            fieldCarts: updatedCarts,
+            trucks: updatedTrucks,
+            inventory: newInventory,
+            money: s.money + moneyEarned,
+            totalEarned: s.totalEarned + moneyEarned,
+            totalDeliveriesCompleted: (s.totalDeliveriesCompleted || 0) + deliveriesThisTick,
+            achievements: newAchievements.length ? [...new Set([...(s.achievements || []), ...newAchievements])] : (s.achievements || []),
+            activeEvents: updatedEvents,
+            dailyMissions: missions,
+            lastSavedTime: Date.now(),
+            marketOrders: (s.marketOrders?.length ? s.marketOrders : generateMarketOrders(s.unlockedCrops, s.prestigeLevel))
+              .map(order => ({ ...order, expiresIn: Math.max(0, order.expiresIn - delta) }))
+              .map(order => order.expiresIn <= 0 ? generateMarketOrders(s.unlockedCrops, s.prestigeLevel)[0] : order),
+            toasts: [...s.toasts, ...newToasts].slice(-5),
+          };
+        });
       },
 
       harvestField: (fieldId) => {
@@ -371,6 +432,8 @@ export const useGameStore = create<GameStore>()(
             [field.crop]: (s.inventory[field.crop] || 0) + toHarvest,
           },
           achievements: isFirstHarvest ? [...(s.achievements || []), 'first_harvest'] : (s.achievements || []),
+          totalCropsHarvested: (s.totalCropsHarvested || 0) + toHarvest,
+          dailyMissions: bumpMissions(s.dailyMissions || [], 'harvest_crops', toHarvest),
           toasts: [
             ...s.toasts,
             { id: uid(), message: `Collected ${toHarvest} ${CROP_CONFIG[field.crop].name.toLowerCase()} into storage.`, type: 'success' as const },
@@ -431,6 +494,8 @@ export const useGameStore = create<GameStore>()(
             fields,
             inventory,
             achievements: achGrant ? [...(s.achievements || []), 'first_harvest'] : (s.achievements || []),
+            totalCropsHarvested: (s.totalCropsHarvested || 0) + harvested,
+            dailyMissions: bumpMissions(s.dailyMissions || [], 'harvest_crops', harvested),
             toasts: [
               ...s.toasts,
               { id: uid(), message: `Collected ${harvested} crops from ${fieldsCollected} field${fieldsCollected === 1 ? '' : 's'}.`, type: 'success' as const },
@@ -515,7 +580,8 @@ export const useGameStore = create<GameStore>()(
           inventory: {},
           money: s.money + rounded,
           totalEarned: s.totalEarned + rounded,
-          toasts: [...s.toasts, { id: uid(), message: `Sold inventory for $${rounded.toLocaleString()}`, type: 'success' as const }].slice(-5),
+          dailyMissions: bumpMissions(bumpMissions(s.dailyMissions || [], 'sell_inventory', 1), 'earn_money', rounded),
+          toasts: [...s.toasts, { id: uid(), message: `Sold inventory for ${formatMoney(rounded)}`, type: 'success' as const }].slice(-5),
         }));
       },
 
@@ -544,10 +610,11 @@ export const useGameStore = create<GameStore>()(
           gems: (s.gems ?? 0) + order.rewardGems,
           totalEarned: s.totalEarned + order.rewardMoney,
           marketOrdersCompleted: (s.marketOrdersCompleted || 0) + 1,
+          dailyMissions: bumpMissions(bumpMissions(s.dailyMissions || [], 'complete_orders', 1), 'earn_money', order.rewardMoney),
           marketOrders: orders.map(o => o.id === orderId ? generateMarketOrders(s.unlockedCrops, s.prestigeLevel)[0] : o),
           toasts: [...s.toasts, {
             id: uid(),
-            message: `${order.customer} order filled! +$${order.rewardMoney.toLocaleString()}${order.rewardGems ? ` +${order.rewardGems} gems` : ''}`,
+            message: `${order.customer} order filled! +${formatMoney(order.rewardMoney)}${order.rewardGems ? ` +${order.rewardGems} gems` : ''}`,
             type: 'success' as const,
           }].slice(-5),
         }));
@@ -607,7 +674,11 @@ export const useGameStore = create<GameStore>()(
           id: uid(), type, crop: 'tomato',
           growthProgress: 0, readyToPick: 0, harvesterId: null,
         };
-        set(s => ({ money: s.money - cfg.price, fields: [...s.fields, newField] }));
+        set(s => ({
+          money: s.money - cfg.price,
+          fields: [...s.fields, newField],
+          dailyMissions: bumpMissions(s.dailyMissions || [], 'buy_anything', 1),
+        }));
         return true;
       },
 
@@ -623,6 +694,7 @@ export const useGameStore = create<GameStore>()(
           fields: openField
             ? s.fields.map(field => field.id === openField.id ? { ...field, harvesterId: newH.id } : field)
             : s.fields,
+          dailyMissions: bumpMissions(s.dailyMissions || [], 'buy_anything', 1),
         }));
         return true;
       },
@@ -632,7 +704,11 @@ export const useGameStore = create<GameStore>()(
         const state = get();
         if (state.money < cfg.price || cfg.prestigeRequired > state.prestigeLevel) return false;
         const newW: Warehouse = { id: uid(), type };
-        set(s => ({ money: s.money - cfg.price, warehouses: [...s.warehouses, newW] }));
+        set(s => ({
+          money: s.money - cfg.price,
+          warehouses: [...s.warehouses, newW],
+          dailyMissions: bumpMissions(s.dailyMissions || [], 'buy_anything', 1),
+        }));
         return true;
       },
 
@@ -644,7 +720,11 @@ export const useGameStore = create<GameStore>()(
           id: uid(), type, status: 'idle',
           cargo: 0, cargoTypes: {}, deliveryProgress: 0,
         };
-        set(s => ({ money: s.money - cfg.price, trucks: [...s.trucks, newT] }));
+        set(s => ({
+          money: s.money - cfg.price,
+          trucks: [...s.trucks, newT],
+          dailyMissions: bumpMissions(s.dailyMissions || [], 'buy_anything', 1),
+        }));
         return true;
       },
 
@@ -656,6 +736,7 @@ export const useGameStore = create<GameStore>()(
         set(s => ({
           money: s.money - cfg.price,
           upgrades: { ...(s.upgrades || {}), [type]: true },
+          dailyMissions: bumpMissions(s.dailyMissions || [], 'buy_anything', 1),
           toasts: [...s.toasts, { id: uid(), message: `${cfg.name} installed.`, type: 'success' as const }].slice(-5),
         }));
         return true;
@@ -677,36 +758,39 @@ export const useGameStore = create<GameStore>()(
       simulateIAP: (itemId) => {
         const item = IAP_ITEMS.find(i => i.id === itemId);
         if (!item) return;
+        const isFirst = !get().hasFirstPurchase;
+        const mult = isFirst ? 2 : 1;
         if (itemId === 'starter_pack') {
-          set(s => ({ money: s.money + 5000, gems: (s.gems ?? 0) + 20 }));
+          set(s => ({ money: s.money + 5000 * mult, gems: (s.gems ?? 0) + 20 * mult }));
           get().buyField('small');
           get().buyHarvester('basic');
         } else if (itemId === 'growth_pack') {
           set(s => ({
-            money: s.money + 25000,
-            gems: (s.gems ?? 0) + 55,
+            money: s.money + 25000 * mult,
+            gems: (s.gems ?? 0) + 55 * mult,
             unlockedCrops: s.unlockedCrops.includes('strawberry')
               ? s.unlockedCrops
               : [...s.unlockedCrops, 'strawberry'],
           }));
           get().buyWarehouse('small');
         } else if (itemId === 'business_pack') {
-          set(s => ({ money: s.money + 100000, gems: (s.gems ?? 0) + 140 }));
+          set(s => ({ money: s.money + 100000 * mult, gems: (s.gems ?? 0) + 140 * mult }));
           get().buyWarehouse('distribution');
           get().buyTruck('box');
         } else if (itemId === 'tycoon_pack') {
           set(s => ({
-            money: s.money + 1000000,
-            gems: (s.gems ?? 0) + 400,
-            totalEarned: s.totalEarned + 1000000,
+            money: s.money + 1000000 * mult,
+            gems: (s.gems ?? 0) + 400 * mult,
+            totalEarned: s.totalEarned + 1000000 * mult,
             prestigeLevel: Math.max(s.prestigeLevel, 1),
             unlockedCrops: ['tomato', 'lettuce', 'strawberry', 'corn'],
           }));
         }
         set(s => ({
-          toasts: [...s.toasts, {
-            id: uid(), message: `${item.name} activated!`, type: 'success' as const,
-          }].slice(-5),
+          hasFirstPurchase: true,
+          toasts: [...s.toasts,
+            { id: uid(), message: `${item.name} activated!${isFirst ? ' 🎁 First-purchase 2× bonus!' : ''}`, type: 'success' as const },
+          ].slice(-5),
         }));
       },
 
@@ -720,8 +804,22 @@ export const useGameStore = create<GameStore>()(
         if (nextLevel >= 1) newUnlocked.push('blueberry');
         if (nextLevel >= 2) newUnlocked.push('truffle');
 
+        // Preserve meta-progression: achievements, missions, streak, first purchase
+        const preserve = {
+          achievements: state.achievements,
+          dailyMissions: state.dailyMissions,
+          missionsDate: state.missionsDate,
+          loginStreak: state.loginStreak,
+          lastLoginDate: state.lastLoginDate,
+          hasFirstPurchase: state.hasFirstPurchase,
+          hasSeenTutorial: state.hasSeenTutorial,
+          totalCropsHarvested: state.totalCropsHarvested,
+          totalDeliveriesCompleted: state.totalDeliveriesCompleted,
+        };
+
         set({
           ...INITIAL_STATE,
+          ...preserve,
           prestigeLevel: nextLevel,
           unlockedCrops: newUnlocked,
           marketOrders: generateMarketOrders(newUnlocked, nextLevel),
@@ -760,10 +858,103 @@ export const useGameStore = create<GameStore>()(
           money: s.money + bonusMoney,
           toasts: [...s.toasts, {
             id: uid(),
-            message: `📅 Day ${streak} streak! +${bonusGems} gems & $${bonusMoney.toLocaleString()} bonus`,
+            message: `📅 Day ${streak} streak! +${bonusGems} gems & ${formatMoney(bonusMoney)} bonus`,
             type: 'success' as const,
           }].slice(-5),
         }));
+      },
+
+      applyOfflineProgress: () => {
+        const state = get();
+        if (!state.lastSavedTime) {
+          set({ lastSavedTime: Date.now() });
+          return;
+        }
+        const now = Date.now();
+        const elapsedSec = Math.max(0, (now - state.lastSavedTime) / 1000);
+        // Cap at 8 hours
+        const cappedSec = Math.min(elapsedSec, 8 * 3600);
+        if (cappedSec < 60) {
+          // Less than a minute, ignore
+          set({ lastSavedTime: now });
+          return;
+        }
+
+        // Compute approximate offline earnings: trucks deliver at a rate based on capacity * delivery time
+        const pm = getPrestigeMultiplier(state.prestigeLevel);
+        const speedMult = state.upgrades?.fasterTrucks ? 1.3 : 1;
+        const marketBonus = state.upgrades?.marketStand ? 1.1 : 1;
+
+        // Average crop value across unlocked crops
+        const avgCropValue = state.unlockedCrops.length > 0
+          ? state.unlockedCrops.reduce((s, c) => s + CROP_CONFIG[c].baseValue, 0) / state.unlockedCrops.length
+          : 5;
+
+        // Estimate income: each truck completes capacity * valueMultiplier per (deliveryTime/speedMult) seconds
+        // BUT throttled by how fast harvesters can supply crops to inventory
+        const truckIncomePerSec = state.trucks.reduce((sum, t) => {
+          const tc = TRUCK_CONFIG[t.type];
+          const tripTime = tc.deliveryTime / speedMult;
+          // Income per delivery
+          return sum + (tc.capacity * avgCropValue * tc.valueMultiplier * pm * marketBonus) / tripTime;
+        }, 0);
+
+        const harvesterRatePerSec = state.harvesters.reduce((sum, h) => sum + HARVESTER_CONFIG[h.type].harvestRate, 0);
+        const supplyIncomePerSec = harvesterRatePerSec * avgCropValue * pm;
+
+        // Idle income capped at the bottleneck, then halved (offline is less efficient)
+        const idleRate = Math.min(truckIncomePerSec, supplyIncomePerSec) * 0.5;
+        const moneyEarned = Math.floor(idleRate * cappedSec);
+        const cropsGrown = Math.floor(harvesterRatePerSec * cappedSec * 0.5);
+
+        set(s => ({
+          money: s.money + moneyEarned,
+          totalEarned: s.totalEarned + moneyEarned,
+          lastSavedTime: now,
+          offlineReport: moneyEarned > 0 || cropsGrown > 0
+            ? { seconds: cappedSec, moneyEarned, cropsGrown }
+            : null,
+        }));
+      },
+
+      clearOfflineReport: () => {
+        set({ offlineReport: null });
+      },
+
+      refreshDailyMissions: () => {
+        const state = get();
+        const today = new Date().toISOString().split('T')[0];
+        if (state.missionsDate === today && state.dailyMissions?.length === 3) return;
+        set({
+          dailyMissions: generateDailyMissions(),
+          missionsDate: today,
+        });
+      },
+
+      claimMissionReward: (missionId) => {
+        const state = get();
+        const mission = (state.dailyMissions || []).find(m => m.id === missionId);
+        if (!mission) return false;
+        if (mission.claimed) return false;
+        if (mission.progress < mission.target) return false;
+
+        set(s => ({
+          gems: (s.gems ?? 0) + mission.rewardGems,
+          money: s.money + mission.rewardMoney,
+          dailyMissions: (s.dailyMissions || []).map(m =>
+            m.id === missionId ? { ...m, claimed: true } : m,
+          ),
+          toasts: [...s.toasts, {
+            id: uid(),
+            message: `${mission.emoji} Mission complete! +${mission.rewardGems} gems & ${formatMoney(mission.rewardMoney)}`,
+            type: 'success' as const,
+          }].slice(-5),
+        }));
+        return true;
+      },
+
+      completeTutorial: () => {
+        set({ hasSeenTutorial: true });
       },
     }),
     {
@@ -786,6 +977,13 @@ export const useGameStore = create<GameStore>()(
         loginStreak: s.loginStreak,
         lastLoginDate: s.lastLoginDate,
         marketOrdersCompleted: s.marketOrdersCompleted,
+        lastSavedTime: s.lastSavedTime,
+        dailyMissions: s.dailyMissions,
+        missionsDate: s.missionsDate,
+        hasFirstPurchase: s.hasFirstPurchase,
+        hasSeenTutorial: s.hasSeenTutorial,
+        totalCropsHarvested: s.totalCropsHarvested,
+        totalDeliveriesCompleted: s.totalDeliveriesCompleted,
       }),
     },
   ),

@@ -5,6 +5,7 @@ import {
   CROP_CONFIG, IAP_ITEMS, UPGRADE_CONFIG,
 } from '../config';
 import type { FieldType, HarvesterType, WarehouseType, TruckType, CropType, UpgradeType } from '../types';
+import { formatMoney, formatNumber } from '../utils/format';
 
 type ShopTab = 'fields' | 'crops' | 'machines' | 'storage' | 'trucks' | 'upgrades' | 'iap';
 
@@ -73,7 +74,7 @@ function ShopCard({ icon, name, desc, price, locked, owned, ownedLabel, onBuy }:
             flexShrink: 0, whiteSpace: 'nowrap',
           }}
         >
-          ${price.toLocaleString()}
+          {formatMoney(price)}
         </button>
       )}
     </div>
@@ -215,7 +216,7 @@ export default function ShopDrawer({ open, onClose }: { open: boolean; onClose: 
                   key={type}
                   icon={cfg.emoji}
                   name={cfg.name}
-                  desc={`${cfg.capacity.toLocaleString()} unit capacity`}
+                  desc={`${formatNumber(cfg.capacity)} unit capacity`}
                   price={cfg.price}
                   locked={cfg.prestigeRequired > store.prestigeLevel}
                   owned={store.warehouses.filter(w => w.type === type).length}
@@ -266,6 +267,22 @@ export default function ShopDrawer({ open, onClose }: { open: boolean; onClose: 
               <p style={{ color: '#94a3b8', fontSize: 11, marginBottom: 10 }}>
                 One-time purchases — unlocks are saved to this browser. Payments secured by Stripe.
               </p>
+              {!store.hasFirstPurchase && (
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(251,191,36,0.18), rgba(245,158,11,0.18))',
+                  border: '1.5px solid #fbbf24',
+                  borderRadius: 12, padding: '10px 14px', marginBottom: 10,
+                  textAlign: 'center',
+                  boxShadow: '0 4px 16px rgba(251,191,36,0.2)',
+                }}>
+                  <div style={{ color: '#fbbf24', fontSize: 13, fontWeight: 900, marginBottom: 2 }}>
+                    🎁 First-Purchase Bonus
+                  </div>
+                  <div style={{ color: '#fde68a', fontSize: 11 }}>
+                    Your first pack gives <b>2× the rewards!</b> One-time offer.
+                  </div>
+                </div>
+              )}
               {IAP_ITEMS.map((item, i) => {
                 const isLoading = loadingItem === item.id;
                 const glows = ['rgba(251,191,36,0.12)', 'rgba(167,139,250,0.12)', 'rgba(249,115,22,0.12)', 'rgba(236,72,153,0.12)'];
@@ -279,7 +296,14 @@ export default function ShopDrawer({ open, onClose }: { open: boolean; onClose: 
                   }}>
                     <span style={{ color: '#c4b5fd', fontSize: 13, fontWeight: 900, width: 48 }}>{item.emoji}</span>
                     <div style={{ flex: 1 }}>
-                      <div style={{ color: 'white', fontWeight: 800, fontSize: 13, marginBottom: 2 }}>{item.name}</div>
+                      <div style={{ color: 'white', fontWeight: 800, fontSize: 13, marginBottom: 2 }}>
+                        {item.name}
+                        {!store.hasFirstPurchase && (
+                          <span style={{ marginLeft: 6, background: '#fbbf24', color: '#1a2744', fontSize: 9, padding: '1px 5px', borderRadius: 6, fontWeight: 900 }}>
+                            2×
+                          </span>
+                        )}
+                      </div>
                       <div style={{ color: '#a78bfa', fontSize: 11 }}>{item.description}</div>
                     </div>
                     <button

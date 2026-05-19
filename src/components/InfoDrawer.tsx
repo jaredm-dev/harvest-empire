@@ -1,6 +1,7 @@
 import { useGameStore } from '../store';
 import { CROP_CONFIG, WAREHOUSE_CONFIG, HARVESTER_CONFIG } from '../config';
 import type { CropType } from '../types';
+import { formatMoney, formatNumber } from '../utils/format';
 
 // ── Warehouse panel ───────────────────────────────────────────────────────────
 export function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -96,7 +97,7 @@ export function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () 
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ color: '#fbbf24', fontWeight: 700, fontSize: 13 }}>
-                        ${Math.floor(Math.floor(amt) * cc.baseValue * pm).toLocaleString()}
+                        {formatMoney(Math.floor(Math.floor(amt) * cc.baseValue * pm))}
                       </div>
                       <div style={{ color: '#475569', fontSize: 10 }}>${cc.baseValue}/unit</div>
                     </div>
@@ -119,7 +120,7 @@ export function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () 
                   fontSize: 15, cursor: 'pointer',
                 }}
               >
-                Sell All — ${Math.floor(sellValue).toLocaleString()}
+                Sell All — {formatMoney(Math.floor(sellValue))}
               </button>
               <p style={{ color: '#475569', fontSize: 10, textAlign: 'center', marginTop: 6 }}>
                 💡 Trucks deliver for up to 1.8× more income
@@ -157,7 +158,7 @@ export function MarketDrawer({ open, onClose }: { open: boolean; onClose: () => 
           <div style={{ background: '#0f172a', borderRadius: 12, padding: '14px', marginBottom: 12 }}>
             <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6 }}>TOTAL EARNINGS</div>
             <div style={{ color: '#fbbf24', fontSize: 28, fontWeight: 800 }}>
-              ${Math.floor(totalEarned).toLocaleString()}
+              {formatMoney(Math.floor(totalEarned))}
             </div>
           </div>
 
@@ -178,7 +179,7 @@ export function MarketDrawer({ open, onClose }: { open: boolean; onClose: () => 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <div style={{ color: '#67e8f9', fontSize: 11, fontWeight: 900, marginBottom: 4 }}>PREMIUM GEMS</div>
-                <div style={{ color: '#ecfeff', fontSize: 24, fontWeight: 900 }}>{Math.floor(gems).toLocaleString()}</div>
+                <div style={{ color: '#ecfeff', fontSize: 24, fontWeight: 900 }}>{formatNumber(Math.floor(gems))}</div>
               </div>
               <div style={{ color: '#bae6fd', fontSize: 11, textAlign: 'right', maxWidth: 170 }}>
                 Refresh rare orders or rush delivery trucks.
@@ -304,7 +305,7 @@ function MarketOrderBoard() {
                 cursor: canFill ? 'pointer' : 'default',
               }}
             >
-              Fill Order - ${(order.rewardMoney ?? 0).toLocaleString()}{order.rewardGems ? ` - +${order.rewardGems} gems` : ''}
+              Fill Order - {formatMoney(order.rewardMoney ?? 0)}{order.rewardGems ? ` - +${order.rewardGems} gems` : ''}
             </button>
           </div>
         );

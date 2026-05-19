@@ -6,8 +6,12 @@ import ShopDrawer from './components/ShopDrawer';
 import { WarehouseDrawer, MarketDrawer, AssignDrawer } from './components/InfoDrawer';
 import ToastStack from './components/ToastStack';
 import PrestigeView from './views/PrestigeView';
+import Tutorial from './components/Tutorial';
+import OfflineModal from './components/OfflineModal';
+import MissionsDrawer from './components/MissionsDrawer';
+import FloatingNumbers from './components/FloatingNumbers';
 
-type Modal = 'none' | 'shop' | 'warehouse' | 'market' | 'prestige' | 'assign';
+type Modal = 'none' | 'shop' | 'warehouse' | 'market' | 'prestige' | 'assign' | 'missions';
 
 export default function App() {
   const [modal, setModal] = useState<Modal>('none');
@@ -16,12 +20,21 @@ export default function App() {
   const checkDailyBonus = useGameStore(s => s.checkDailyBonus);
   const simulateIAP = useGameStore(s => s.simulateIAP);
   const addToast = useGameStore(s => s.addToast);
+  const applyOfflineProgress = useGameStore(s => s.applyOfflineProgress);
+  const refreshDailyMissions = useGameStore(s => s.refreshDailyMissions);
+  const hasSeenTutorial = useGameStore(s => s.hasSeenTutorial);
+  const dailyMissions = useGameStore(s => s.dailyMissions || []);
+
   const lastTime = useRef(performance.now());
   const rafRef = useRef(0);
   const accum = useRef(0);
   const TICK = 0.15;
 
-  useEffect(() => { checkDailyBonus(); }, [checkDailyBonus]);
+  useEffect(() => {
+    applyOfflineProgress();
+    checkDailyBonus();
+    refreshDailyMissions();
+  }, [applyOfflineProgress, checkDailyBonus, refreshDailyMissions]);
 
   // Handle return from Stripe Checkout
   useEffect(() => {
@@ -68,6 +81,8 @@ export default function App() {
 
   const close = () => setModal('none');
 
+  const readyMissionCount = dailyMissions.filter(m => !m.claimed && m.progress >= m.target).length;
+
   return (
     <div className="phone-shell">
       <GameWorld
@@ -78,11 +93,13 @@ export default function App() {
 
       <HUD onPrestige={() => setModal('prestige')} />
       <ToastStack />
+      <FloatingNumbers />
 
       <div className="bottom-bar">
         <ToolBtn icon="shop" label="Shop" onClick={() => setModal('shop')} active={modal === 'shop'} />
         <ToolBtn icon="storage" label="Storage" onClick={() => setModal('warehouse')} active={modal === 'warehouse'} />
         <ToolBtn icon="market" label="Market" onClick={() => setModal('market')} active={modal === 'market'} />
+        <MissionsBtn onClick={() => setModal('missions')} active={modal === 'missions'} readyCount={readyMissionCount} />
         <ToolBtn icon="prestige" label="Prestige" onClick={() => setModal('prestige')} active={modal === 'prestige'} />
       </div>
 
@@ -90,6 +107,7 @@ export default function App() {
       <WarehouseDrawer open={modal === 'warehouse'} onClose={close} />
       <MarketDrawer open={modal === 'market'} onClose={close} />
       <AssignDrawer open={modal === 'assign'} fieldId={selectedField} onClose={close} />
+      <MissionsDrawer open={modal === 'missions'} onClose={close} />
 
       {modal === 'prestige' && (
         <>
@@ -105,6 +123,9 @@ export default function App() {
           </div>
         </>
       )}
+
+      <OfflineModal />
+      {!hasSeenTutorial && <Tutorial />}
     </div>
   );
 }
@@ -123,6 +144,41 @@ function ToolBtn({ icon, label, onClick, active }: {
     >
       <span className={`tool-icon tool-icon-${icon}`} aria-hidden="true" />
       <span className="tool-label">{label}</span>
+    </button>
+  );
+}
+
+function MissionsBtn({ onClick, active, readyCount }: {
+  onClick: () => void;
+  active: boolean;
+  readyCount: number;
+}) {
+  return (
+    <button
+      className={`tool-btn ${active ? 'active' : ''}`}
+      onClick={onClick}
+      aria-pressed={active}
+      style={{ position: 'relative' }}
+    >
+      <span style={{
+        fontSize: 22, lineHeight: 1, display: 'block',
+        marginBottom: 2,
+      }} aria-hidden="true">📅</span>
+      <span className="tool-label">Missions</span>
+      {readyCount > 0 && (
+        <span
+          className="mission-badge-ready"
+          style={{
+            position: 'absolute', top: 4, right: 8,
+            background: '#16a34a', color: 'white',
+            fontSize: 10, fontWeight: 900,
+            padding: '2px 6px', borderRadius: 10,
+            minWidth: 16, textAlign: 'center',
+          }}
+        >
+          {readyCount}
+        </span>
+      )}
     </button>
   );
 }

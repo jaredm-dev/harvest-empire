@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../store';
 import { PRESTIGE_CONFIG, EVENT_CONFIG } from '../config';
+import { formatMoney, formatNumber } from '../utils/format';
 
 // ← Update this to your Ko-fi page once you create one at ko-fi.com
 const KOFI_URL = 'https://ko-fi.com/harvestempire';
@@ -44,14 +45,13 @@ export default function HUD({ onPrestige }: Props) {
       <div className="hud-panel">
         <div className="hud-main-row">
           <div className={pop ? 'hud-money pop' : 'hud-money'}>
-            <span>$</span>
-            <span>{Math.floor(display).toLocaleString()}</span>
+            <span>{formatMoney(Math.floor(display))}</span>
           </div>
 
           <div className="hud-right">
             <div className="hud-gems">
               <span className="gem-cut" />
-              <span>{Math.floor(gems).toLocaleString()}</span>
+              <span>{formatNumber(Math.floor(gems))}</span>
             </div>
             {prestigeLevel > 0 && (
               <div className="hud-multiplier">{multiplier}x income</div>
@@ -110,8 +110,8 @@ export default function HUD({ onPrestige }: Props) {
               <div className="progress-fill" style={{ width: `${pct}%` }} />
             </div>
             <div className="progress-labels">
-              <span>${Math.floor(totalEarned).toLocaleString()} earned</span>
-              <span>Goal: ${nextP.requirement.toLocaleString()}</span>
+              <span>{formatMoney(Math.floor(totalEarned))} earned</span>
+              <span>Goal: {formatMoney(nextP.requirement)}</span>
             </div>
           </div>
         )}

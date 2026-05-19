@@ -155,3 +155,25 @@ export const getPrestigeMultiplier = (level: number) => {
   if (level === 0) return 1;
   return PRESTIGE_CONFIG[Math.min(level - 1, PRESTIGE_CONFIG.length - 1)].multiplier;
 };
+
+// Daily mission templates — system picks 3 per day
+import type { MissionType } from './types';
+export const MISSION_POOL: Array<{
+  type: MissionType;
+  target: number;
+  rewardGems: number;
+  rewardMoney: number;
+  description: string;
+  emoji: string;
+}> = [
+  { type: 'harvest_crops',   target: 50,  rewardGems: 5,  rewardMoney: 500,    description: 'Harvest 50 crops',           emoji: '🌾' },
+  { type: 'harvest_crops',   target: 200, rewardGems: 10, rewardMoney: 2000,   description: 'Harvest 200 crops',          emoji: '🌾' },
+  { type: 'sell_inventory',  target: 3,   rewardGems: 5,  rewardMoney: 500,    description: 'Sell inventory 3 times',     emoji: '💵' },
+  { type: 'complete_orders', target: 3,   rewardGems: 8,  rewardMoney: 1500,   description: 'Complete 3 market orders',   emoji: '📦' },
+  { type: 'complete_orders', target: 8,   rewardGems: 15, rewardMoney: 5000,   description: 'Complete 8 market orders',   emoji: '📦' },
+  { type: 'earn_money',      target: 10000,  rewardGems: 8,  rewardMoney: 1000,description: 'Earn $10K',                  emoji: '💰' },
+  { type: 'earn_money',      target: 100000, rewardGems: 15, rewardMoney: 5000,description: 'Earn $100K',                 emoji: '💰' },
+  { type: 'buy_anything',    target: 3,   rewardGems: 5,  rewardMoney: 500,    description: 'Buy 3 things from the shop', emoji: '🛒' },
+  { type: 'use_truck',       target: 5,   rewardGems: 5,  rewardMoney: 1000,   description: 'Complete 5 truck deliveries',emoji: '🚛' },
+  { type: 'use_truck',       target: 15,  rewardGems: 12, rewardMoney: 4000,   description: 'Complete 15 truck deliveries',emoji: '🚛' },
+];

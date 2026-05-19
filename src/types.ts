@@ -85,6 +85,32 @@ export interface GameEvent {
   duration: number;
 }
 
+export type MissionType =
+  | 'harvest_crops'
+  | 'sell_inventory'
+  | 'complete_orders'
+  | 'earn_money'
+  | 'buy_anything'
+  | 'use_truck';
+
+export interface DailyMission {
+  id: string;
+  type: MissionType;
+  target: number;
+  progress: number;
+  rewardGems: number;
+  rewardMoney: number;
+  claimed: boolean;
+  description: string;
+  emoji: string;
+}
+
+export interface OfflineReport {
+  seconds: number;
+  moneyEarned: number;
+  cropsGrown: number;
+}
+
 export interface GameStore {
   money: number;
   gems: number;
@@ -105,6 +131,18 @@ export interface GameStore {
   loginStreak: number;
   lastLoginDate: string | null;
   marketOrdersCompleted: number;
+
+  // New: offline progress + daily missions + first purchase + tutorial
+  lastSavedTime: number | null;
+  dailyMissions: DailyMission[];
+  missionsDate: string | null;
+  hasFirstPurchase: boolean;
+  hasSeenTutorial: boolean;
+  offlineReport: OfflineReport | null;
+
+  // Lifetime stats for missions
+  totalCropsHarvested: number;
+  totalDeliveriesCompleted: number;
 
   tick: (delta: number) => void;
   harvestField: (fieldId: string) => HarvestResult;
@@ -130,4 +168,9 @@ export interface GameStore {
   dismissToast: (id: string) => void;
   addToast: (message: string, type?: Toast['type']) => void;
   checkDailyBonus: () => void;
+  applyOfflineProgress: () => void;
+  clearOfflineReport: () => void;
+  refreshDailyMissions: () => void;
+  claimMissionReward: (missionId: string) => boolean;
+  completeTutorial: () => void;
 }
