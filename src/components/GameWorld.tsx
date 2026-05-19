@@ -554,8 +554,14 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
   const fieldCarts  = useGameStore(s => s.fieldCarts);
   const harvestField = useGameStore(s => s.harvestField);
   const collectAllReady = useGameStore(s => s.collectReadyFields);
-  const inventory   = useGameStore(s => s.inventory);
-  const money       = useGameStore(s => s.money);
+  // Subscribe to total inventory as a derived NUMBER instead of the
+  // inventory object — the object reference changes every tick even when
+  // nothing meaningful changed.
+  const totalInv = useGameStore(s => {
+    let total = 0;
+    for (const v of Object.values(s.inventory)) total += v || 0;
+    return total;
+  });
 
   // Pan — start centered on the main field area
   const [pan, setPan] = useState(() => panToCenter(FIELD_ANCHOR));
@@ -674,16 +680,20 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
   // Particles
   const [particles, setParticles] = useState<Particle[]>([]);
 
-  // Track earnings for market flash
+  // Track earnings for market flash — subscribe via store API so this does
+  // not re-render the component on every money change.
   const [lastEarned, setLastEarned] = useState(0);
-  const prevMoney = useRef(money);
   useEffect(() => {
-    if (money > prevMoney.current) {
-      const diff = money - prevMoney.current;
-      if (diff > 2) setLastEarned(diff);
-    }
-    prevMoney.current = money;
-  }, [money]);
+    let prev = useGameStore.getState().money;
+    return useGameStore.subscribe(state => {
+      const m = state.money;
+      if (m > prev) {
+        const diff = m - prev;
+        if (diff > 2) setLastEarned(diff);
+      }
+      prev = m;
+    });
+  }, []);
 
   // Harvest handler
   const doHarvest = useCallback((field: Field, wx: number, wy: number) => {
@@ -718,7 +728,26 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     setTimeout(() => setParticles(ps => ps.filter(p => !newPs.find(n => n.id === p.id))), 1200);
   }, [collectAllReady]);
 
-  // Pan handlers
+  // Pan handlers — pan deltas are accumulated in a ref and flushed at most
+  // once per animation frame to avoid one React re-render per mousemove event
+  // (which can fire faster than the display refresh rate, e.g. 240Hz mice).
+  const pendingPan = useRef<{ dx: number; dy: number } | null>(null);
+  const panRafRef  = useRef<number>(0);
+
+  const flushPan = useCallback(() => {
+    panRafRef.current = 0;
+    const p = pendingPan.current;
+    if (!p) return;
+    pendingPan.current = null;
+    const { dx, dy } = p;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    setPan(prev => ({
+      x: Math.min(vw * 0.4, Math.max(-(SVG_W - vw), prev.x + dx)),
+      y: Math.min(vh * 0.3, Math.max(-(SVG_H - vh), prev.y + dy)),
+    }));
+  }, []);
+
   const onPtrDown = (e: React.PointerEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest?.('[data-world-control="true"]')) return;
@@ -733,14 +762,27 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     const dy = e.clientY - lastXY.current.y;
     lastXY.current = { x: e.clientX, y: e.clientY };
     dragDist.current += Math.abs(dx) + Math.abs(dy);
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    setPan(p => ({
-      x: Math.min(vw * 0.4, Math.max(-(SVG_W - vw), p.x + dx)),
-      y: Math.min(vh * 0.3, Math.max(-(SVG_H - vh), p.y + dy)),
-    }));
+
+    if (pendingPan.current) {
+      pendingPan.current.dx += dx;
+      pendingPan.current.dy += dy;
+    } else {
+      pendingPan.current = { dx, dy };
+    }
+    if (!panRafRef.current) {
+      panRafRef.current = requestAnimationFrame(flushPan);
+    }
   };
-  const onPtrUp = () => { ptrDown.current = false; };
+  const onPtrUp = () => {
+    ptrDown.current = false;
+    // Flush any pending delta on release so we don't leave the world in
+    // a half-updated position.
+    if (panRafRef.current) {
+      cancelAnimationFrame(panRafRef.current);
+      panRafRef.current = 0;
+      flushPan();
+    }
+  };
 
   // ── VIEWPORT CULLING ──────────────────────────────────────────────────────────
   const vpW = typeof window !== 'undefined' ? window.innerWidth  : 1280;
@@ -988,7 +1030,6 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
 
   // ── RENDER ────────────────────────────────────────────────────────────────────
   const warehouses = useGameStore(s => s.warehouses);
-  const totalInv = Object.values(inventory).reduce((s, v) => s + (v || 0), 0);
   const totalCap = warehouses.reduce((sum, warehouse) => sum + WAREHOUSE_CONFIG[warehouse.type].capacity, 0);
   const storageSpace = Math.max(totalCap - totalInv, 0);
   const readyFieldCount = fields.filter(field => field.readyToPick >= 1).length;
