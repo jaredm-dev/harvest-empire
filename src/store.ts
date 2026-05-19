@@ -314,7 +314,9 @@ export const useGameStore = create<GameStore>()(
                 earned += (amt || 0) * cc.baseValue * tc.valueMultiplier * pm * marketBonus * eventDeliveryMult;
               }
               moneyEarned += earned;
-              newToasts.push({ id: uid(), message: `Delivery complete! +${formatMoney(earned)}`, type: 'success' });
+              // Truck deliveries are silent on toast — floating "+$X" and the
+              // HUD money pop are the visible signal. With multiple trucks
+              // these would spam the screen.
               return { ...truck, status: 'returning' as const, deliveryProgress: 0 };
             }
             return { ...truck, deliveryProgress: newProg };
@@ -430,6 +432,8 @@ export const useGameStore = create<GameStore>()(
 
         Sound.harvest();
         const isFirstHarvest = !(state.achievements || []).includes('first_harvest');
+        // Per-tap harvest is silent on toast (sound + animation cover it).
+        // First-harvest achievement still surfaces.
         set(s => ({
           fields: s.fields.map(f =>
             f.id === fieldId ? { ...normalizeField(f), readyToPick: Math.max(0, f.readyToPick - toHarvest), readyAge: 0 } : f,
@@ -441,11 +445,9 @@ export const useGameStore = create<GameStore>()(
           achievements: isFirstHarvest ? [...(s.achievements || []), 'first_harvest'] : (s.achievements || []),
           totalCropsHarvested: (s.totalCropsHarvested || 0) + toHarvest,
           dailyMissions: bumpMissions(s.dailyMissions || [], 'harvest_crops', toHarvest),
-          toasts: [
-            ...s.toasts,
-            { id: uid(), message: `Collected ${toHarvest} ${CROP_CONFIG[field.crop].name.toLowerCase()} into storage.`, type: 'success' as const },
-            ...(isFirstHarvest ? [{ id: uid(), message: '🌾 Achievement: First Harvest — Collect your first crop', type: 'achievement' as const }] : []),
-          ].slice(-5),
+          toasts: isFirstHarvest
+            ? [...s.toasts, { id: uid(), message: '🌾 Achievement: First Harvest — You picked your very first crop', type: 'achievement' as const }].slice(-5)
+            : s.toasts,
         }));
 
         return { harvested: toHarvest };
@@ -504,11 +506,9 @@ export const useGameStore = create<GameStore>()(
             achievements: achGrant ? [...(s.achievements || []), 'first_harvest'] : (s.achievements || []),
             totalCropsHarvested: (s.totalCropsHarvested || 0) + harvested,
             dailyMissions: bumpMissions(s.dailyMissions || [], 'harvest_crops', harvested),
-            toasts: [
-              ...s.toasts,
-              { id: uid(), message: `Collected ${harvested} crops from ${fieldsCollected} field${fieldsCollected === 1 ? '' : 's'}.`, type: 'success' as const },
-              ...(achGrant ? [{ id: uid(), message: '🌾 Achievement: First Harvest — Collect your first crop', type: 'achievement' as const }] : []),
-            ].slice(-5),
+            toasts: achGrant
+              ? [...s.toasts, { id: uid(), message: '🌾 Achievement: First Harvest — You picked your very first crop', type: 'achievement' as const }].slice(-5)
+              : s.toasts,
           };
         });
 
@@ -585,12 +585,13 @@ export const useGameStore = create<GameStore>()(
         if (earned <= 0) return;
         const rounded = Math.floor(earned);
         Sound.cash();
+        // No toast — the floating "+$X" + cash jingle is enough feedback for
+        // a player-triggered sell.
         set(s => ({
           inventory: {},
           money: s.money + rounded,
           totalEarned: s.totalEarned + rounded,
           dailyMissions: bumpMissions(bumpMissions(s.dailyMissions || [], 'sell_inventory', 1), 'earn_money', rounded),
-          toasts: [...s.toasts, { id: uid(), message: `Cashed out — ${formatMoney(rounded)} in your pocket.`, type: 'success' as const }].slice(-5),
         }));
       },
 
@@ -614,6 +615,9 @@ export const useGameStore = create<GameStore>()(
         }
 
         Sound.cash();
+        // No toast — player just clicked Fill Order. The cash jingle, gem
+        // counter, and floating "+$X" provide the feedback. Gems get a brief
+        // toast only when awarded so the player notices.
         set(s => ({
           inventory,
           money: s.money + order.rewardMoney,
@@ -622,11 +626,9 @@ export const useGameStore = create<GameStore>()(
           marketOrdersCompleted: (s.marketOrdersCompleted || 0) + 1,
           dailyMissions: bumpMissions(bumpMissions(s.dailyMissions || [], 'complete_orders', 1), 'earn_money', order.rewardMoney),
           marketOrders: orders.map(o => o.id === orderId ? generateMarketOrders(s.unlockedCrops, s.prestigeLevel)[0] : o),
-          toasts: [...s.toasts, {
-            id: uid(),
-            message: `${order.customer} is happy! +${formatMoney(order.rewardMoney)}${order.rewardGems ? ` +${order.rewardGems} gems` : ''}`,
-            type: 'success' as const,
-          }].slice(-5),
+          toasts: order.rewardGems
+            ? [...s.toasts, { id: uid(), message: `+${order.rewardGems} gems`, type: 'success' as const }].slice(-5)
+            : s.toasts,
         }));
         return true;
       },
@@ -748,6 +750,47 @@ export const useGameStore = create<GameStore>()(
           upgrades: { ...(s.upgrades || {}), [type]: true },
           dailyMissions: bumpMissions(s.dailyMissions || [], 'buy_anything', 1),
           toasts: [...s.toasts, { id: uid(), message: `${cfg.name} installed.`, type: 'success' as const }].slice(-5),
+        }));
+        return true;
+      },
+
+      sellTruck: (truckId) => {
+        const state = get();
+        const truck = state.trucks.find(t => t.id === truckId);
+        if (!truck) return false;
+        if (truck.status !== 'idle') {
+          state.addToast('Wait for this truck to return before selling.', 'warning');
+          return false;
+        }
+        const refund = Math.floor(TRUCK_CONFIG[truck.type].price * 0.55);
+        Sound.cash();
+        set(s => ({
+          trucks: s.trucks.filter(t => t.id !== truckId),
+          money: s.money + refund,
+          toasts: [...s.toasts, {
+            id: uid(),
+            message: `Sold ${TRUCK_CONFIG[truck.type].name} for ${formatMoney(refund)}`,
+            type: 'success' as const,
+          }].slice(-5),
+        }));
+        return true;
+      },
+
+      sellHarvester: (harvesterId) => {
+        const state = get();
+        const h = state.harvesters.find(h => h.id === harvesterId);
+        if (!h) return false;
+        const refund = Math.floor(HARVESTER_CONFIG[h.type].price * 0.55);
+        Sound.cash();
+        set(s => ({
+          harvesters: s.harvesters.filter(x => x.id !== harvesterId),
+          fields: s.fields.map(f => f.harvesterId === harvesterId ? { ...f, harvesterId: null } : f),
+          money: s.money + refund,
+          toasts: [...s.toasts, {
+            id: uid(),
+            message: `Sold ${HARVESTER_CONFIG[h.type].name} for ${formatMoney(refund)}`,
+            type: 'success' as const,
+          }].slice(-5),
         }));
         return true;
       },

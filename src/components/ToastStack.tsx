@@ -5,9 +5,16 @@ export default function ToastStack() {
   const toasts = useGameStore(s => s.toasts);
   const dismiss = useGameStore(s => s.dismissToast);
 
+  // Auto-dismiss each toast on a fixed interval. Faster for success
+  // (player already triggered it and saw the result), slower for
+  // achievements/warnings that need to be read.
   useEffect(() => {
     if (toasts.length === 0) return;
-    const timer = setTimeout(() => dismiss(toasts[0].id), 3200);
+    const head = toasts[0];
+    const lifetime = head.type === 'achievement' ? 3000
+      : head.type === 'warning' ? 2400
+      : 1600;
+    const timer = setTimeout(() => dismiss(head.id), lifetime);
     return () => clearTimeout(timer);
   }, [toasts, dismiss]);
 

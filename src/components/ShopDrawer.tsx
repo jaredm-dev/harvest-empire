@@ -10,13 +10,13 @@ import { formatMoney, formatNumber } from '../utils/format';
 type ShopTab = 'fields' | 'crops' | 'machines' | 'storage' | 'trucks' | 'upgrades' | 'iap';
 
 const TABS: { id: ShopTab; icon: string; label: string; highlight?: boolean }[] = [
-  { id: 'iap', icon: '💎', label: 'Boosts', highlight: true },
   { id: 'fields', icon: '▦', label: 'Fields' },
   { id: 'crops', icon: '●', label: 'Crops' },
   { id: 'machines', icon: '⚙', label: 'Machines' },
   { id: 'storage', icon: '▣', label: 'Storage' },
   { id: 'trucks', icon: '▰', label: 'Trucks' },
   { id: 'upgrades', icon: '✦', label: 'Systems' },
+  { id: 'iap', icon: '💎', label: 'Boosts', highlight: true },
 ];
 
 interface ShopCardProps {
@@ -82,7 +82,7 @@ function ShopCard({ icon, name, desc, price, locked, owned, ownedLabel, onBuy }:
 }
 
 export default function ShopDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [tab, setTab] = useState<ShopTab>('iap');
+  const [tab, setTab] = useState<ShopTab>('fields');
   const [loadingItem, setLoadingItem] = useState<string | null>(null);
   const store = useGameStore();
 

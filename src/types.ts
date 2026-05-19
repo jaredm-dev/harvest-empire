@@ -163,6 +163,9 @@ export interface GameStore {
   buyUpgrade: (type: UpgradeType) => boolean;
   unlockCrop: (crop: CropType) => boolean;
 
+  sellTruck: (truckId: string) => boolean;
+  sellHarvester: (harvesterId: string) => boolean;
+
   simulateIAP: (itemId: string) => void;
   prestige: () => void;
   dismissToast: (id: string) => void;

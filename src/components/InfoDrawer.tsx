@@ -137,11 +137,8 @@ export function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () 
 export function MarketDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const totalEarned = useGameStore(s => s.totalEarned);
   const prestigeLevel = useGameStore(s => s.prestigeLevel);
-  const trucks = useGameStore(s => s.trucks);
   const gems = useGameStore(s => s.gems ?? 0);
 
-  const rushTruckWithGems = useGameStore(s => s.rushTruckWithGems);
-  const activeTrucks = trucks.filter(t => t.status !== 'idle');
   const pm = [1, 1.5, 2.5, 4][Math.min(prestigeLevel, 3)];
 
   return (
@@ -189,41 +186,69 @@ export function MarketDrawer({ open, onClose }: { open: boolean; onClose: () => 
 
           <MarketOrderBoard />
 
-          <div style={{ background: '#0f172a', borderRadius: 12, padding: '14px' }}>
-            <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 8 }}>ACTIVE DELIVERIES</div>
-            {activeTrucks.length === 0 ? (
-              <div style={{ color: '#475569', fontSize: 12 }}>No deliveries in progress</div>
-            ) : (
-              activeTrucks.map(t => (
-                <div key={t.id} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '8px 0', borderBottom: '1px solid #1e293b',
-                }}>
-                  <div style={{ color: 'white', fontSize: 13 }}>
-                    {t.status === 'delivering' ? '🚀' : '↩'} {t.cargo} units
-                  </div>
-                  <button
-                    onClick={() => rushTruckWithGems(t.id)}
-                    style={{
-                      border: '1px solid #0e7490',
-                      background: '#082f49',
-                      color: '#cffafe',
-                      borderRadius: 9,
-                      padding: '5px 8px',
-                      fontSize: 10,
-                      fontWeight: 900,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Rush 3 gems - {Math.round(t.deliveryProgress * 100)}%
-                  </button>
-                </div>
-              ))
-            )}
-          </div>
+          <FleetPanel />
         </div>
       </div>
     </>
+  );
+}
+
+function FleetPanel() {
+  const trucks = useGameStore(s => s.trucks);
+  const rushTruckWithGems = useGameStore(s => s.rushTruckWithGems);
+  const sellTruck = useGameStore(s => s.sellTruck);
+
+  return (
+    <div style={{ background: 'rgba(42,26,62,0.65)', borderRadius: 14, padding: 14, border: '1px solid var(--surface-line)' }}>
+      <div style={{ color: 'var(--gold)', fontSize: 11, fontWeight: 800, letterSpacing: 0.4, marginBottom: 10, textTransform: 'uppercase' }}>
+        Your Fleet
+      </div>
+      {trucks.length === 0 ? (
+        <div style={{ color: 'var(--ink-mute)', fontSize: 12 }}>No trucks yet — buy one from the Shop.</div>
+      ) : (
+        trucks.map(t => {
+          const isIdle = t.status === 'idle';
+          return (
+            <div key={t.id} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '8px 0', borderBottom: '1px solid rgba(107,79,156,0.25)', gap: 8,
+            }}>
+              <div style={{ color: 'white', fontSize: 13, fontWeight: 700, flex: 1 }}>
+                {isIdle ? '🅿️ Parked' : t.status === 'delivering' ? '🚀 Delivering' : '↩ Returning'}
+                {!isIdle && ` · ${t.cargo}u · ${Math.round(t.deliveryProgress * 100)}%`}
+              </div>
+              {isIdle ? (
+                <button
+                  onClick={() => { if (confirm('Sell this truck for 55% of its price?')) sellTruck(t.id); }}
+                  style={{
+                    border: '1px solid var(--terracotta)',
+                    background: 'rgba(224,122,95,0.18)',
+                    color: 'var(--cream)',
+                    borderRadius: 9, padding: '5px 10px', fontSize: 11, fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Sell
+                </button>
+              ) : (
+                <button
+                  onClick={() => rushTruckWithGems(t.id)}
+                  style={{
+                    border: '1px solid var(--info)',
+                    background: 'rgba(167,139,250,0.18)',
+                    color: 'var(--cream)',
+                    borderRadius: 9, padding: '5px 10px', fontSize: 11, fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Rush 3💎
+                </button>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
   );
 }
 

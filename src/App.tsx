@@ -32,6 +32,21 @@ export default function App() {
     for (const m of missions) if (!m.claimed && m.progress >= m.target) count++;
     return count;
   });
+  // Orders the player has enough inventory to fill right now
+  const readyOrderCount = useGameStore(s => {
+    const orders = s.marketOrders;
+    if (!orders || orders.length === 0) return 0;
+    const inv = s.inventory;
+    let count = 0;
+    for (const o of orders) {
+      let ok = true;
+      for (const [crop, amount] of Object.entries(o.requirements)) {
+        if ((inv[crop as keyof typeof inv] || 0) < (amount || 0)) { ok = false; break; }
+      }
+      if (ok) count++;
+    }
+    return count;
+  });
 
   const lastTime = useRef(performance.now());
   const rafRef = useRef(0);
@@ -104,7 +119,7 @@ export default function App() {
       <div className="bottom-bar">
         <ToolBtn icon="shop" label="Shop" onClick={() => setModal('shop')} active={modal === 'shop'} />
         <ToolBtn icon="storage" label="Storage" onClick={() => setModal('warehouse')} active={modal === 'warehouse'} />
-        <ToolBtn icon="market" label="Market" onClick={() => setModal('market')} active={modal === 'market'} />
+        <ToolBtn icon="market" label="Market" onClick={() => setModal('market')} active={modal === 'market'} badge={readyOrderCount} />
         <MissionsBtn onClick={() => setModal('missions')} active={modal === 'missions'} readyCount={readyMissionCount} />
         <ToolBtn icon="prestige" label="Prestige" onClick={() => setModal('prestige')} active={modal === 'prestige'} />
       </div>
@@ -136,20 +151,37 @@ export default function App() {
   );
 }
 
-function ToolBtn({ icon, label, onClick, active }: {
+function ToolBtn({ icon, label, onClick, active, badge }: {
   icon: 'shop' | 'storage' | 'market' | 'prestige';
   label: string;
   onClick: () => void;
   active: boolean;
+  badge?: number;
 }) {
   return (
     <button
       className={`tool-btn ${active ? 'active' : ''}`}
       onClick={() => { Sound.click(); onClick(); }}
       aria-pressed={active}
+      style={{ position: 'relative' }}
     >
       <span className={`tool-icon tool-icon-${icon}`} aria-hidden="true" />
       <span className="tool-label">{label}</span>
+      {badge && badge > 0 ? (
+        <span
+          className="mission-badge-ready"
+          style={{
+            position: 'absolute', top: 2, right: 4,
+            background: 'var(--terracotta)', color: 'white',
+            fontSize: 10, fontWeight: 900,
+            padding: '2px 6px', borderRadius: 10,
+            minWidth: 16, textAlign: 'center',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.32)',
+          }}
+        >
+          {badge}
+        </span>
+      ) : null}
     </button>
   );
 }
