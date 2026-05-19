@@ -20,24 +20,24 @@ export default function OfflineModal() {
         textAlign: 'center',
       }}>
         <div style={{ fontSize: 64, marginBottom: 8 }}>🌙</div>
-        <div style={{ color: 'white', fontSize: 22, fontWeight: 900, marginBottom: 6 }}>Welcome back!</div>
-        <div style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>
-          You were away for {formatDuration(report.seconds)}
+        <div className="display" style={{ color: 'white', fontSize: 26, fontWeight: 700, marginBottom: 6 }}>The farm kept working</div>
+        <div style={{ color: 'var(--ink-dim)', fontSize: 13, marginBottom: 16 }}>
+          You were gone for {formatDuration(report.seconds)}. The fields didn't notice.
         </div>
 
         <div style={{
-          background: 'rgba(251,191,36,0.1)',
-          border: '1px solid rgba(251,191,36,0.3)',
-          borderRadius: 12, padding: '14px 16px', marginBottom: 16,
+          background: 'rgba(242,204,143,0.12)',
+          border: '1.5px solid rgba(242,204,143,0.4)',
+          borderRadius: 14, padding: '14px 16px', marginBottom: 16,
         }}>
-          <div style={{ color: '#fbbf24', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-            While you were gone
+          <div style={{ color: 'var(--gold)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+            Earned while you were out
           </div>
-          <div style={{ color: 'white', fontSize: 28, fontWeight: 900 }}>
+          <div className="display" style={{ color: 'white', fontSize: 32, fontWeight: 700 }}>
             +{formatMoney(report.moneyEarned)}
           </div>
           {report.cropsGrown > 0 && (
-            <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 4 }}>
+            <div style={{ color: 'var(--ink-dim)', fontSize: 12, marginTop: 4 }}>
               ~{formatNumber(report.cropsGrown)} crops auto-harvested
             </div>
           )}
@@ -47,12 +47,13 @@ export default function OfflineModal() {
           onClick={clearOfflineReport}
           style={{
             width: '100%',
-            background: 'linear-gradient(135deg,#fbbf24,#f59e0b)',
-            color: '#1a2744', border: 'none', fontSize: 14, fontWeight: 900,
-            padding: '12px 20px', borderRadius: 10, cursor: 'pointer',
+            background: 'linear-gradient(135deg, var(--terracotta), var(--gold))',
+            color: 'var(--surface-deep)', border: 'none', fontSize: 14, fontWeight: 800,
+            padding: '12px 20px', borderRadius: 12, cursor: 'pointer',
+            fontFamily: 'Fredoka, sans-serif',
           }}
         >
-          Collect & Continue 🌾
+          Back to work 🌾
         </button>
       </div>
     </>

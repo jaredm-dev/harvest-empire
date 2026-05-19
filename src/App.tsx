@@ -10,6 +10,7 @@ import Tutorial from './components/Tutorial';
 import OfflineModal from './components/OfflineModal';
 import MissionsDrawer from './components/MissionsDrawer';
 import FloatingNumbers from './components/FloatingNumbers';
+import { Sound } from './utils/sound';
 
 type Modal = 'none' | 'shop' | 'warehouse' | 'market' | 'prestige' | 'assign' | 'missions';
 
@@ -144,7 +145,7 @@ function ToolBtn({ icon, label, onClick, active }: {
   return (
     <button
       className={`tool-btn ${active ? 'active' : ''}`}
-      onClick={onClick}
+      onClick={() => { Sound.click(); onClick(); }}
       aria-pressed={active}
     >
       <span className={`tool-icon tool-icon-${icon}`} aria-hidden="true" />
@@ -161,7 +162,7 @@ function MissionsBtn({ onClick, active, readyCount }: {
   return (
     <button
       className={`tool-btn ${active ? 'active' : ''}`}
-      onClick={onClick}
+      onClick={() => { Sound.click(); onClick(); }}
       aria-pressed={active}
       style={{ position: 'relative' }}
     >

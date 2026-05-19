@@ -7,6 +7,8 @@ import {
   ACHIEVEMENT_CONFIG, EVENT_CONFIG, MISSION_POOL,
 } from './config';
 import { formatMoney } from './utils/format';
+import { Sound } from './utils/sound';
+import { celebrate } from './utils/confetti';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -336,7 +338,11 @@ export const useGameStore = create<GameStore>()(
             newAchievements.push(id);
             achieved.add(id);
             const cfg = ACHIEVEMENT_CONFIG[id];
-            if (cfg) newToasts.push({ id: uid(), message: `${cfg.emoji} Achievement: ${cfg.name} — ${cfg.description}`, type: 'achievement' as const });
+            if (cfg) {
+              newToasts.push({ id: uid(), message: `${cfg.emoji} Achievement: ${cfg.name} — ${cfg.description}`, type: 'achievement' as const });
+              // Fire the chime on next tick so it doesn't get swallowed mid-state-update
+              setTimeout(() => { Sound.achievement(); celebrate('small'); }, 0);
+            }
           }
         };
         const nextTotal = state.totalEarned + moneyEarned;
@@ -422,6 +428,7 @@ export const useGameStore = create<GameStore>()(
         const toHarvest = Math.min(Math.floor(field.readyToPick), space);
         if (toHarvest === 0) return { harvested: 0, reason: 'not_ready' };
 
+        Sound.harvest();
         const isFirstHarvest = !(state.achievements || []).includes('first_harvest');
         set(s => ({
           fields: s.fields.map(f =>
@@ -483,6 +490,7 @@ export const useGameStore = create<GameStore>()(
 
         if (harvested <= 0) return { harvested: 0, fieldsCollected: 0, reason: 'none_ready' as const };
 
+        Sound.harvest();
         const isFirstHarvestBulk = !(get().achievements || []).includes('first_harvest');
         set(s => {
           const inventory = { ...s.inventory };
@@ -576,12 +584,13 @@ export const useGameStore = create<GameStore>()(
         }
         if (earned <= 0) return;
         const rounded = Math.floor(earned);
+        Sound.cash();
         set(s => ({
           inventory: {},
           money: s.money + rounded,
           totalEarned: s.totalEarned + rounded,
           dailyMissions: bumpMissions(bumpMissions(s.dailyMissions || [], 'sell_inventory', 1), 'earn_money', rounded),
-          toasts: [...s.toasts, { id: uid(), message: `Sold inventory for ${formatMoney(rounded)}`, type: 'success' as const }].slice(-5),
+          toasts: [...s.toasts, { id: uid(), message: `Cashed out — ${formatMoney(rounded)} in your pocket.`, type: 'success' as const }].slice(-5),
         }));
       },
 
@@ -604,6 +613,7 @@ export const useGameStore = create<GameStore>()(
           inventory[crop as CropType] = Math.max(0, (inventory[crop as CropType] || 0) - (amount || 0));
         }
 
+        Sound.cash();
         set(s => ({
           inventory,
           money: s.money + order.rewardMoney,
@@ -614,7 +624,7 @@ export const useGameStore = create<GameStore>()(
           marketOrders: orders.map(o => o.id === orderId ? generateMarketOrders(s.unlockedCrops, s.prestigeLevel)[0] : o),
           toasts: [...s.toasts, {
             id: uid(),
-            message: `${order.customer} order filled! +${formatMoney(order.rewardMoney)}${order.rewardGems ? ` +${order.rewardGems} gems` : ''}`,
+            message: `${order.customer} is happy! +${formatMoney(order.rewardMoney)}${order.rewardGems ? ` +${order.rewardGems} gems` : ''}`,
             type: 'success' as const,
           }].slice(-5),
         }));
@@ -786,10 +796,12 @@ export const useGameStore = create<GameStore>()(
             unlockedCrops: ['tomato', 'lettuce', 'strawberry', 'corn'],
           }));
         }
+        Sound.cash();
+        celebrate(isFirst ? 'large' : 'medium');
         set(s => ({
           hasFirstPurchase: true,
           toasts: [...s.toasts,
-            { id: uid(), message: `${item.name} activated!${isFirst ? ' 🎁 First-purchase 2× bonus!' : ''}`, type: 'success' as const },
+            { id: uid(), message: `${item.name} unlocked!${isFirst ? ' 🎁 First-purchase 2× bonus applied!' : ''}`, type: 'success' as const },
           ].slice(-5),
         }));
       },
@@ -799,6 +811,8 @@ export const useGameStore = create<GameStore>()(
         const nextLevel = state.prestigeLevel + 1;
         const cfg = PRESTIGE_CONFIG[nextLevel - 1];
         if (!cfg || state.totalEarned < cfg.requirement) return;
+        Sound.fanfare();
+        celebrate('large');
 
         const newUnlocked: CropType[] = ['tomato', 'lettuce', 'strawberry', 'corn'];
         if (nextLevel >= 1) newUnlocked.push('blueberry');
@@ -838,6 +852,7 @@ export const useGameStore = create<GameStore>()(
       },
 
       addToast: (message, type = 'info') => {
+        if (type === 'warning') Sound.warn();
         set(s => ({
           toasts: [...s.toasts, { id: uid(), message, type }].slice(-5),
         }));
@@ -851,6 +866,23 @@ export const useGameStore = create<GameStore>()(
         const streak = state.lastLoginDate === yesterday ? (state.loginStreak || 0) + 1 : 1;
         const bonusGems = Math.min(5 + streak * 2, 20);
         const bonusMoney = Math.min(200 + streak * 300, 5000);
+
+        // Celebrate milestone streaks
+        const isMilestone = streak === 3 || streak === 7 || streak === 14 || streak % 30 === 0;
+        if (isMilestone) {
+          setTimeout(() => { Sound.achievement(); celebrate('medium'); }, 200);
+        } else {
+          setTimeout(() => Sound.cash(), 200);
+        }
+
+        const flavor = streak === 1
+          ? 'Welcome back, farmer!'
+          : streak === 7
+            ? 'A full week — the chickens know you by name now.'
+            : streak === 30
+              ? 'A whole month! The town held a parade in your honor.'
+              : `${streak} days strong — the harvest welcomes you.`;
+
         set(s => ({
           lastLoginDate: today,
           loginStreak: streak,
@@ -858,7 +890,7 @@ export const useGameStore = create<GameStore>()(
           money: s.money + bonusMoney,
           toasts: [...s.toasts, {
             id: uid(),
-            message: `📅 Day ${streak} streak! +${bonusGems} gems & ${formatMoney(bonusMoney)} bonus`,
+            message: `📅 ${flavor} +${bonusGems} gems & ${formatMoney(bonusMoney)}`,
             type: 'success' as const,
           }].slice(-5),
         }));
@@ -938,6 +970,8 @@ export const useGameStore = create<GameStore>()(
         if (mission.claimed) return false;
         if (mission.progress < mission.target) return false;
 
+        Sound.achievement();
+        celebrate('medium');
         set(s => ({
           gems: (s.gems ?? 0) + mission.rewardGems,
           money: s.money + mission.rewardMoney,
@@ -946,7 +980,7 @@ export const useGameStore = create<GameStore>()(
           ),
           toasts: [...s.toasts, {
             id: uid(),
-            message: `${mission.emoji} Mission complete! +${mission.rewardGems} gems & ${formatMoney(mission.rewardMoney)}`,
+            message: `${mission.emoji} Mission claimed! +${mission.rewardGems} gems & ${formatMoney(mission.rewardMoney)}`,
             type: 'success' as const,
           }].slice(-5),
         }));
