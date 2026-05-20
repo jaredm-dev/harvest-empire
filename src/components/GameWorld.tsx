@@ -1009,12 +1009,11 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
       className="world-viewport"
       style={{ cursor: 'default' }}
     >
-      {/* ── Sky strip ── */}
+      {/* Sky band — sits on top of the grass background. Sun + clouds. */}
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
-        height: 112,
-        background: 'linear-gradient(180deg, #7cc9ff 0%, #c9efff 58%, rgba(201,239,212,0.86) 100%)',
-        pointerEvents: 'none', zIndex: 0,
+        height: 110,
+        pointerEvents: 'none', zIndex: 1,
       }}>
         <div style={{
           position: 'absolute', top: 18, right: 62,
@@ -1022,7 +1021,7 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
           background: 'radial-gradient(circle at 35% 35%, #fef9c3, #facc15 56%, #f59e0b)',
           boxShadow: '0 0 30px rgba(250,204,21,0.5)',
         }} />
-        {[[30,8,38],[160,20,30],[310,5,34],[460,16,28]].map(([x,y,s],i) => (
+        {[[30,8,38],[160,20,30],[310,5,34],[460,16,28],[640,12,32],[820,22,28],[1000,8,36],[1180,18,30]].map(([x,y,s],i) => (
           <div key={i} style={{ position: 'absolute', left: x, top: y, width: s * 1.7, height: s * 0.62, opacity: 0.85 }}>
             <span style={{ position: 'absolute', left: 0, bottom: 0, width: '72%', height: '56%', borderRadius: 999, background: 'rgba(255,255,255,0.86)' }} />
             <span style={{ position: 'absolute', left: '24%', bottom: '18%', width: '48%', height: '78%', borderRadius: '50%', background: 'rgba(255,255,255,0.92)' }} />
@@ -1036,7 +1035,7 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
       {/* ── World SVG + HTML overlay ── */}
       <div
         className="world-map"
-        style={{ transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`, transformOrigin: '0 0', width: SVG_W, height: SVG_H, background: '#66bf62' }}
+        style={{ transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`, transformOrigin: '0 0', width: SVG_W, height: SVG_H, background: 'transparent' }}
       >
         <svg
           width={SVG_W}
@@ -1177,10 +1176,9 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
             </filter>
           </defs>
 
-          {/* Single grass background rect — replaces what used to be 700+ per-tile
-              grass polygons. The browser tiles the SVG pattern once for the
-              whole canvas, so the visual texture is back without the GPU cost. */}
-          <rect x="0" y="0" width={SVG_W} height={SVG_H} fill="url(#grassPat)" />
+          {/* Grass is now drawn as a CSS background on .world-viewport so it
+              spans the ENTIRE screen, not just the SVG canvas. No background
+              rect needed here. */}
 
           {/* Render all items */}
           {items.map((item, i) => {

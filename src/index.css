@@ -89,15 +89,20 @@ h1, h2, h3 {
   inset: 0;
   overflow: clip;
   touch-action: none;
-  /* Sky band at the very top, then solid green that matches the SVG
-     grass-pattern base color (#66bf62) — so the area around the playable
-     diamond looks continuous with the textured grass inside it. */
-  background:
+  background-color: #66bf62;
+  /* The textured grass is a tileable inline SVG used as a CSS background,
+     so it fills the ENTIRE viewport — no bare flat-green strips at the
+     edges of the playable area. The sky gradient sits on top of the grass
+     and only fades in for the top ~14% of the screen. */
+  background-image:
     linear-gradient(180deg,
       #8fd7ff 0%,
       #bdeeff 7%,
-      #66bf62 13%,
-      #66bf62 100%);
+      rgba(189, 238, 255, 0.65) 11%,
+      transparent 14%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='30' height='30'><rect width='30' height='30' fill='%2366bf62'/><path d='M2 23 Q8 17 15 23 T29 23' fill='none' stroke='rgba(255,255,255,0.09)' stroke-width='1'/><path d='M5 9 q3,-4 6,0 M20 15 q3,-4 6,0' stroke='%233f9c43' stroke-width='1.2' fill='none' stroke-linecap='round' opacity='0.42'/><circle cx='8' cy='8' r='1.2' fill='rgba(255,255,255,0.13)'/><circle cx='22' cy='17' r='1' fill='rgba(0,0,0,0.045)'/></svg>");
+  background-repeat: no-repeat, repeat;
+  background-size: 100% 100%, 30px 30px;
 }
 
 .world-map {
