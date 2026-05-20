@@ -89,8 +89,15 @@ h1, h2, h3 {
   inset: 0;
   overflow: clip;
   touch-action: none;
+  /* Sky band at the very top, then solid green that matches the SVG
+     grass-pattern base color (#66bf62) — so the area around the playable
+     diamond looks continuous with the textured grass inside it. */
   background:
-    linear-gradient(180deg, #8fd7ff 0%, #bdeeff 11%, #78bd6c 23%, #4c9a44 100%);
+    linear-gradient(180deg,
+      #8fd7ff 0%,
+      #bdeeff 7%,
+      #66bf62 13%,
+      #66bf62 100%);
 }
 
 .world-map {

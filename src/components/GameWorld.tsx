@@ -42,8 +42,8 @@ const OX = 700;
 const OY = 140;
 
 // SVG canvas size
-const SVG_W = 1900;
-const SVG_H = 1200;
+const SVG_W = 2600;
+const SVG_H = 1600;
 
 // World-space focus points for each camera preset (calibrated from the map layout)
 const FIELD_ANCHOR = { wx: 705, wy: 477 };
@@ -1036,7 +1036,7 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
       {/* ── World SVG + HTML overlay ── */}
       <div
         className="world-map"
-        style={{ transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`, transformOrigin: '0 0', width: SVG_W, height: SVG_H, background: '#5eac53' }}
+        style={{ transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})`, transformOrigin: '0 0', width: SVG_W, height: SVG_H, background: '#66bf62' }}
       >
         <svg
           width={SVG_W}
