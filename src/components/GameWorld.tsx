@@ -42,8 +42,8 @@ const OX = 700;
 const OY = 140;
 
 // SVG canvas size
-const SVG_W = 4000;
-const SVG_H = 2800;
+const SVG_W = 2400;
+const SVG_H = 1700;
 
 // World-space focus points for each camera preset (calibrated from the map layout)
 const FIELD_ANCHOR = { wx: 705, wy: 477 };
@@ -886,9 +886,9 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
   const treeTiles = decorTiles.slice(0, 18);
   const accentTiles = decorTiles.slice(18);
 
-  // Grass background — only visible tiles
-  for (let c = -5; c <= 34; c++) {
-    for (let r = -4; r <= 23; r++) {
+  // Grass background — tight bounds around the playable area, only visible tiles
+  for (let c = -6; c <= 31; c++) {
+    for (let r = -3; r <= 23; r++) {
       if (isTileVisible(c, r)) items.push({ kind: 'grass', col: c, row: r });
     }
   }
@@ -1319,37 +1319,18 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
               const { x, y } = iso(item.col, item.row);
               const alt = (item.col + item.row) % 3 === 0;
               const tilePts = `${x},${y} ${x+HW},${y+HH} ${x},${y+TH} ${x-HW},${y+HH}`;
-              if (IS_MOBILE) {
-                return (
-                  <polygon
-                    key={`g${i}`}
-                    points={tilePts}
-                    fill={alt ? '#59ad57' : '#66bf62'}
-                    stroke="rgba(30,86,38,0.15)" strokeWidth={0.5}
-                  />
-                );
-              }
-              const detail = Math.abs((item.col * 17 + item.row * 29) % 11);
+              // Cheap path: single polygon per tile, no overlay, no decorative
+              // tufts. Each tile was previously 2–4 SVG nodes; this is 1.
+              // The flat color difference between alt/normal still gives a
+              // checkered texture variation that reads as "grass".
               return (
-                <g key={`g${i}`}>
-                  <polygon
-                    points={tilePts}
-                    fill={alt ? 'url(#grassDark)' : 'url(#grassPat)'}
-                    stroke="rgba(30,86,38,0.16)" strokeWidth={0.6}
-                  />
-                  <polygon
-                    points={tilePts}
-                    fill="url(#grassTileLight)"
-                    opacity="0.72"
-                  />
-                  {detail < 5 && (
-                    <g opacity="0.55">
-                      <path d={`M${x - 12},${y + 22} q3,-7 6,0 M${x + 10},${y + 26} q3,-6 6,0`} stroke="#2f8f3a" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-                      {detail === 0 && <circle cx={x + 2} cy={y + 21} r="1.8" fill="#facc15" />}
-                      {detail === 1 && <circle cx={x - 18} cy={y + 27} r="1.5" fill="#f472b6" />}
-                    </g>
-                  )}
-                </g>
+                <polygon
+                  key={`g${i}`}
+                  points={tilePts}
+                  fill={alt ? '#59ad57' : '#66bf62'}
+                  stroke="rgba(30,86,38,0.14)"
+                  strokeWidth={0.5}
+                />
               );
             }
 
