@@ -615,8 +615,10 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     if (typeof window === 'undefined') return { zoom: 0.7, pan: { x: 0, y: 0 } };
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    // Account for HUD ~96px at the top and bottom bar ~76px
-    const usableH = Math.max(300, vh - 180);
+    // Reserve room for HUD (~110px), sky band (~110px), and bottom bar (~80px)
+    const skyReserve = 110;
+    const hudReserve = 110;
+    const usableH = Math.max(300, vh - hudReserve - skyReserve - 80);
     // Approximate world content footprint
     const contentW = 1700;
     const contentH = 1000;
@@ -624,8 +626,10 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     return {
       zoom: z,
       pan: {
-        x: Math.round((vw - contentW * z) / 2 - (-150 * z)), // offset so negative cols still fit
-        y: Math.round(96 + (usableH - contentH * z) / 2 - 70 * z),
+        x: Math.round((vw - contentW * z) / 2 - (-150 * z)),
+        // Push the world down so it starts BELOW the sky band — homestead
+        // no longer kisses the top of the screen.
+        y: Math.round(hudReserve + skyReserve + (usableH - contentH * z) / 2 - 70 * z),
       },
     };
   };
@@ -774,13 +778,15 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     if (isTileVisible(ROAD_COL, r))     items.push({ kind: 'road', col: ROAD_COL,     row: r });
     if (isTileVisible(ROAD_COL + 1, r)) items.push({ kind: 'road', col: ROAD_COL + 1, row: r });
   }
+  // Extended service roads — push the road network out past the playable
+  // area on each side so the empty grass doesn't end abruptly.
   SERVICE_ROAD_ROWS.forEach(row => {
-    for (let c = -1; c <= ROAD_COL + 1; c++) {
+    for (let c = -4; c <= ROAD_COL + 4; c++) {
       if (!fieldOccupiesTile(c, row) && isTileVisible(c, row)) items.push({ kind: 'road', col: c, row });
     }
   });
   SERVICE_ROAD_COLS.forEach(col => {
-    for (let r = -1; r <= 23; r++) {
+    for (let r = -4; r <= 26; r++) {
       if (!fieldOccupiesTile(col, r) && isTileVisible(col, r)) items.push({ kind: 'road', col, row: r });
     }
   });
@@ -829,6 +835,34 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     .forEach((harvester, idx) => {
       items.push({ kind: 'parkedHarvester', htype: harvester.type, idx });
     });
+
+  // Perimeter fence — a clean wooden border that wraps around the whole
+  // playable area. Frames the farm so the empty grass beyond looks like
+  // intentional pasture, not unused canvas.
+  const PERIM_MIN_COL = -2;
+  const PERIM_MAX_COL = 30;
+  const PERIM_MIN_ROW = 0;
+  const PERIM_MAX_ROW = 22;
+  for (let c = PERIM_MIN_COL; c <= PERIM_MAX_COL; c++) {
+    if (isTileVisible(c, PERIM_MIN_ROW)) {
+      items.push({ kind: 'fence', col: c, row: PERIM_MIN_ROW, side: 'NW' });
+      items.push({ kind: 'fence', col: c, row: PERIM_MIN_ROW, side: 'NE' });
+    }
+    if (isTileVisible(c, PERIM_MAX_ROW)) {
+      items.push({ kind: 'fence', col: c, row: PERIM_MAX_ROW, side: 'SW' });
+      items.push({ kind: 'fence', col: c, row: PERIM_MAX_ROW, side: 'SE' });
+    }
+  }
+  for (let r = PERIM_MIN_ROW; r <= PERIM_MAX_ROW; r++) {
+    if (isTileVisible(PERIM_MIN_COL, r)) {
+      items.push({ kind: 'fence', col: PERIM_MIN_COL, row: r, side: 'NW' });
+      items.push({ kind: 'fence', col: PERIM_MIN_COL, row: r, side: 'SW' });
+    }
+    if (isTileVisible(PERIM_MAX_COL, r)) {
+      items.push({ kind: 'fence', col: PERIM_MAX_COL, row: r, side: 'NE' });
+      items.push({ kind: 'fence', col: PERIM_MAX_COL, row: r, side: 'SE' });
+    }
+  }
 
   // Buildings (decorative first so they depth-sort correctly)
   items.push({ kind: 'building', id: 'home' });
