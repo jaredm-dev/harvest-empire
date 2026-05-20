@@ -42,8 +42,8 @@ const OX = 700;
 const OY = 140;
 
 // SVG canvas size
-const SVG_W = 2400;
-const SVG_H = 1700;
+const SVG_W = 1900;
+const SVG_H = 1200;
 
 // World-space focus points for each camera preset (calibrated from the map layout)
 const FIELD_ANCHOR = { wx: 705, wy: 477 };
@@ -74,7 +74,7 @@ const FIELD_TILE_SIZE: Record<string, number> = {
 const WH        = { col: 23, row: 2,  w: 5, d: 3, h: 52, label: 'WAREHOUSE' };
 const MKT       = { col: 23, row: 10, w: 4, d: 3, h: 42, label: 'MARKET' };
 const HOMESTEAD = { col: 0, row: 3, w: 3, d: 3, h: 40, label: 'HOMESTEAD' };
-const BARN_DECO = { col: -5, row: 18, w: 4, d: 3, h: 46, label: 'BARN' };
+// Removed BARN_DECO — was purely decorative and stretched the world to the left.
 
 // Road tiles — connects warehouse to market
 const ROAD_COL       = 29;
@@ -305,16 +305,16 @@ interface WorldObstacle {
 const WANDER = { x1: 80, x2: 1200, y1: 150, y2: 920 };
 const ASPEED: Record<'cow' | 'chicken', number> = { cow: 18, chicken: 34 };
 const ANIMAL_SCALE: Record<'cow' | 'chicken', number> = { cow: 0.86, chicken: 0.82 };
+// Trimmed from 37 tiles to 14 — most of the discarded ones extended outside
+// the visible playable area or duplicated nearby trees. Fewer SVG nodes per
+// frame, much faster on weaker GPUs.
 const DECOR_TILES = [
-  [-2, 1], [-2, 5], [-2, 9], [-2, 13], [-2, 17],
-  [21, 0], [21, 4], [21, 9], [21, 15], [21, 20],
-  [0, 22], [5, 22], [11, 22], [17, 22],
-  [3, -3], [9, -3], [15, -3], [21, -1],
-  [6, -3], [10, -3],
-  [-3, 12], [-3, 15], [-1, 17],
+  [-2, 5], [-2, 13],
+  [21, 4], [21, 15],
   [4, 4], [13, 4], [4, 13], [13, 13],
-  [5, 6], [12, 6], [5, 14], [12, 14], [18, 7], [2, 20],
-  [6, -1], [14, -1], [0, 5], [0, 11], [0, 17],
+  [5, 22], [17, 22],
+  [-1, 17], [18, 7],
+  [9, -3], [15, -3],
 ] as const;
 
 const isInObstacle = (x: number, y: number, obstacles: WorldObstacle[]) =>
@@ -336,14 +336,12 @@ const randTarget = (obstacles: WorldObstacle[] = []) => {
 };
 
 function makeInitialAnimals(obstacles: WorldObstacle[] = []): AnimalAI[] {
+  // Reduced from 7 to 3 — each animal runs constant CSS animations + an AI
+  // step every frame. 7 was enough to make the GPU sweat on weaker machines.
   return [
     { id: 'a0', type: 'cow',     x: 260, y: 520, ...randTarget(obstacles), flip: false, moving: false, idleTimer: 2.2 },
-    { id: 'a1', type: 'cow',     x: 430, y: 680, ...randTarget(obstacles), flip: true,  moving: false, idleTimer: 3.8 },
-    { id: 'a2', type: 'cow',     x: 190, y: 760, ...randTarget(obstacles), flip: false, moving: true,  idleTimer: 0 },
-    { id: 'a3', type: 'chicken', x: 310, y: 430, ...randTarget(obstacles), flip: false, moving: true,  idleTimer: 0 },
-    { id: 'a4', type: 'chicken', x: 670, y: 650, ...randTarget(obstacles), flip: true,  moving: false, idleTimer: 1.4 },
-    { id: 'a5', type: 'chicken', x: 480, y: 830, ...randTarget(obstacles), flip: false, moving: true,  idleTimer: 0 },
-    { id: 'a6', type: 'chicken', x: 600, y: 520, ...randTarget(obstacles), flip: true,  moving: false, idleTimer: 2.1 },
+    { id: 'a1', type: 'chicken', x: 310, y: 430, ...randTarget(obstacles), flip: false, moving: true,  idleTimer: 0 },
+    { id: 'a2', type: 'chicken', x: 480, y: 660, ...randTarget(obstacles), flip: true,  moving: false, idleTimer: 1.4 },
   ];
 }
 
@@ -609,17 +607,38 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     return total;
   });
 
-  // Pan — start centered on the main field area
-  const [pan, setPan] = useState(() => panToCenter(FIELD_ANCHOR));
+  // Initial zoom is chosen so the entire farm fits on a typical viewport
+  // without the player needing to pan. They can still zoom/pan if they want.
+  const initialZoom = (() => {
+    if (typeof window === 'undefined') return 0.7;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // Content roughly spans 1700 × 1000 in world coords
+    return Math.min(vw / 1700, vh / 1000, 1.2);
+  })();
+
+  // Pan — start with the world centered in the viewport at the initial zoom.
+  const initialPan = (() => {
+    if (typeof window === 'undefined') return { x: 0, y: 0 };
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // FIELD_ANCHOR is roughly the geometric center of the content
+    return {
+      x: Math.round(vw / 2 - FIELD_ANCHOR.wx * initialZoom),
+      y: Math.round(vh / 2 - FIELD_ANCHOR.wy * initialZoom),
+    };
+  })();
+
+  const [pan, setPan] = useState(initialPan);
   const [viewMode, setViewMode] = useState<'field' | 'depot'>('field');
   const [machineClock, setMachineClock] = useState(0);
   const vpRef    = useRef<HTMLDivElement>(null);
   const ptrDown  = useRef(false);
   const lastXY   = useRef({ x: 0, y: 0 });
   const dragDist = useRef(0);
-  const zoomRef  = useRef(1.0);
+  const zoomRef  = useRef(initialZoom);
   const keysHeld = useRef<Set<string>>(new Set());
-  const [zoom, setZoom] = useState(1.0);
+  const [zoom, setZoom] = useState(initialZoom);
 
   // Smooth pan animation
   const panAnimRef = useRef<number>(0);
@@ -855,7 +874,7 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     | { kind: 'soil';      col: number; row: number; field: Field; fIdx: number }
     | { kind: 'road';      col: number; row: number }
     | { kind: 'fence';     col: number; row: number; side: 'NE'|'NW'|'SE'|'SW' }
-    | { kind: 'building';  id: 'wh' | 'mkt' | 'home' | 'barn' }
+    | { kind: 'building';  id: 'wh' | 'mkt' | 'home' }
     | { kind: 'crop';      col: number; row: number; field: Field; fIdx: number }
     | { kind: 'harvester'; field: Field; fIdx: number; htype: HarvesterType; depth: number }
     | { kind: 'parkedHarvester'; htype: HarvesterType; idx: number }
@@ -869,7 +888,7 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     return col >= slot.col && col < slot.col + sz && row >= slot.row && row < slot.row + sz;
   });
   const buildingOccupiesTile = (col: number, row: number) =>
-    [WH, MKT, HOMESTEAD, BARN_DECO].some(b =>
+    [WH, MKT, HOMESTEAD].some(b =>
       col >= b.col - 1 && col <= b.col + b.w && row >= b.row - 1 && row <= b.row + b.d,
     );
   const roadOccupiesTile = (col: number, row: number) => {
@@ -886,12 +905,8 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
   const treeTiles = decorTiles.slice(0, 18);
   const accentTiles = decorTiles.slice(18);
 
-  // Grass background — tight bounds around the playable area, only visible tiles
-  for (let c = -6; c <= 31; c++) {
-    for (let r = -3; r <= 23; r++) {
-      if (isTileVisible(c, r)) items.push({ kind: 'grass', col: c, row: r });
-    }
-  }
+  // Grass tiles removed — the world-map div now has a flat green background.
+  // This was the single biggest perf cost: ~700 SVG polygons per frame.
 
   // Road tiles — culled to viewport
   for (let r = ROAD_ROW_START; r <= ROAD_ROW_END; r++) {
@@ -956,7 +971,7 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
 
   // Buildings (decorative first so they depth-sort correctly)
   items.push({ kind: 'building', id: 'home' });
-  items.push({ kind: 'building', id: 'barn' });
+  // barn building was removed — it was purely decorative.
   items.push({ kind: 'building', id: 'wh' });
   items.push({ kind: 'building', id: 'mkt' });
 
@@ -971,8 +986,7 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
   const buildingDepth = (id: string) => {
     if (id === 'wh')   return (WH.col + WH.w)        + (WH.row + WH.d);
     if (id === 'mkt')  return (MKT.col + MKT.w)       + (MKT.row + MKT.d);
-    if (id === 'home') return (HOMESTEAD.col + HOMESTEAD.w) + (HOMESTEAD.row + HOMESTEAD.d);
-    /* barn */         return (BARN_DECO.col + BARN_DECO.w)  + (BARN_DECO.row + BARN_DECO.d);
+    /* home */         return (HOMESTEAD.col + HOMESTEAD.w) + (HOMESTEAD.row + HOMESTEAD.d);
   };
   items.sort((a, b) => {
     const da = a.kind === 'building'  ? buildingDepth(a.id)
@@ -1123,7 +1137,6 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
       buildingRect(WH),
       buildingRect(MKT),
       buildingRect(HOMESTEAD),
-      buildingRect(BARN_DECO),
       ...fieldBlocks,
       ...decorBlocks,
     ];
@@ -1161,13 +1174,7 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
         ))}
       </div>
 
-      <div className="atmosphere-layer" aria-hidden="true">
-        <div className="fog-bank fog-one" />
-        <div className="fog-bank fog-two" />
-        <div className="bird bird-one">⌁</div>
-        <div className="bird bird-two">⌁</div>
-        <div className="bird bird-three">⌁</div>
-      </div>
+      {/* fog/birds removed — were animating blur/transform filters constantly. */}
 
       {/* ── World SVG + HTML overlay ── */}
       <div
@@ -1494,7 +1501,8 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
             }
 
             if (item.kind === 'parkedHarvester') {
-              const base = iso(BARN_DECO.col + BARN_DECO.w + 1 + (item.idx % 3), BARN_DECO.row + BARN_DECO.d + 1 + Math.floor(item.idx / 3));
+              // Park spare harvesters just south of the homestead instead of by a non-existent barn.
+              const base = iso(HOMESTEAD.col + HOMESTEAD.w + 1 + (item.idx % 3), HOMESTEAD.row + HOMESTEAD.d + 1 + Math.floor(item.idx / 3));
               return (
                 <g key={`phv${i}`}>
                   <HarvesterSprite x={base.x} y={base.y - 10} type={item.htype} />
@@ -1515,14 +1523,14 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
               );
             }
 
-            if (item.kind === 'building' && (item.id === 'home' || item.id === 'barn')) {
-              const B    = item.id === 'home' ? HOMESTEAD : BARN_DECO;
+            if (item.kind === 'building' && item.id === 'home') {
+              const B    = HOMESTEAD;
               const N    = iso(B.col,       B.row);
               const E    = iso(B.col + B.w, B.row);
               const S    = iso(B.col + B.w, B.row + B.d);
               const W    = iso(B.col,       B.row + B.d);
               const H    = B.h;
-              const isH  = item.id === 'home';
+              const isH  = true; // homestead-only path now
 
               const cx   = (N.x + E.x + S.x + W.x) / 4;
               const cy   = (N.y + E.y + S.y + W.y) / 4;
