@@ -607,123 +607,38 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     return total;
   });
 
-  // Initial zoom is chosen so the entire farm fits on a typical viewport
-  // without the player needing to pan. They can still zoom/pan if they want.
-  const initialZoom = (() => {
-    if (typeof window === 'undefined') return 0.7;
+  // ── STATIC FIT-TO-VIEW CAMERA ────────────────────────────────────────────
+  // The map is no longer pannable / zoomable. Zoom + pan are derived from
+  // the viewport size so the whole farm is visible at once. This kills the
+  // constant-input loop that was burning CPU/GPU before.
+  const computeView = () => {
+    if (typeof window === 'undefined') return { zoom: 0.7, pan: { x: 0, y: 0 } };
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    // Content roughly spans 1700 × 1000 in world coords
-    return Math.min(vw / 1700, vh / 1000, 1.2);
-  })();
-
-  // Pan — start with the world centered in the viewport at the initial zoom.
-  const initialPan = (() => {
-    if (typeof window === 'undefined') return { x: 0, y: 0 };
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    // FIELD_ANCHOR is roughly the geometric center of the content
+    // Account for HUD ~96px at the top and bottom bar ~76px
+    const usableH = Math.max(300, vh - 180);
+    // Approximate world content footprint
+    const contentW = 1700;
+    const contentH = 1000;
+    const z = Math.max(0.4, Math.min(vw / contentW, usableH / contentH, 1.1));
     return {
-      x: Math.round(vw / 2 - FIELD_ANCHOR.wx * initialZoom),
-      y: Math.round(vh / 2 - FIELD_ANCHOR.wy * initialZoom),
+      zoom: z,
+      pan: {
+        x: Math.round((vw - contentW * z) / 2 - (-150 * z)), // offset so negative cols still fit
+        y: Math.round(96 + (usableH - contentH * z) / 2 - 70 * z),
+      },
     };
-  })();
+  };
+  const [view, setView] = useState(computeView);
+  const { pan, zoom } = view;
 
-  const [pan, setPan] = useState(initialPan);
-  const [viewMode, setViewMode] = useState<'field' | 'depot'>('field');
   const [machineClock, setMachineClock] = useState(0);
-  const vpRef    = useRef<HTMLDivElement>(null);
-  const ptrDown  = useRef(false);
-  const lastXY   = useRef({ x: 0, y: 0 });
-  const dragDist = useRef(0);
-  const zoomRef  = useRef(initialZoom);
-  const keysHeld = useRef<Set<string>>(new Set());
-  const [zoom, setZoom] = useState(initialZoom);
+  const vpRef = useRef<HTMLDivElement>(null);
+  const dragDist = useRef(0); // kept for click-vs-drag detection (always 0 now)
 
-  // Smooth pan animation
-  const panAnimRef = useRef<number>(0);
-  const animatePan = useCallback((tx: number, ty: number) => {
-    cancelAnimationFrame(panAnimRef.current);
-    const step = () => {
-      setPan(p => {
-        const nx = p.x + (tx - p.x) * 0.12;
-        const ny = p.y + (ty - p.y) * 0.12;
-        if (Math.abs(nx - tx) < 0.5 && Math.abs(ny - ty) < 0.5) return { x: tx, y: ty };
-        panAnimRef.current = requestAnimationFrame(step);
-        return { x: nx, y: ny };
-      });
-    };
-    panAnimRef.current = requestAnimationFrame(step);
-  }, []);
-
-  // Keep the viewport's scrollTop/Left at 0 — browser may auto-scroll to focused buttons
+  // Recompute fit on resize so the world stays centered on any screen size.
   useEffect(() => {
-    const vp = vpRef.current;
-    if (vp) { vp.scrollTop = 0; vp.scrollLeft = 0; }
-  }, [pan]);
-
-  // Mouse wheel zoom toward cursor
-  useEffect(() => {
-    const vp = vpRef.current;
-    if (!vp) return;
-    const handler = (e: WheelEvent) => {
-      e.preventDefault();
-      const prevZoom = zoomRef.current;
-      const newZoom = Math.min(2.5, Math.max(0.35, prevZoom * (e.deltaY > 0 ? 0.92 : 1.09)));
-      const rect = vp.getBoundingClientRect();
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      zoomRef.current = newZoom;
-      setZoom(newZoom);
-      setPan(p => ({
-        x: cx - (cx - p.x) * (newZoom / prevZoom),
-        y: cy - (cy - p.y) * (newZoom / prevZoom),
-      }));
-    };
-    vp.addEventListener('wheel', handler, { passive: false });
-    return () => vp.removeEventListener('wheel', handler);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // WASD / arrow key camera pan
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','w','a','s','d','W','A','S','D'].includes(e.key)) {
-        e.preventDefault();
-        keysHeld.current.add(e.key);
-      }
-    };
-    const onKeyUp = (e: KeyboardEvent) => keysHeld.current.delete(e.key);
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    let raf = 0;
-    const step = () => {
-      const k = keysHeld.current;
-      let dx = 0, dy = 0;
-      const spd = Math.round(8 / zoomRef.current);
-      if (k.has('ArrowLeft')  || k.has('a') || k.has('A')) dx += spd;
-      if (k.has('ArrowRight') || k.has('d') || k.has('D')) dx -= spd;
-      if (k.has('ArrowUp')    || k.has('w') || k.has('W')) dy += spd;
-      if (k.has('ArrowDown')  || k.has('s') || k.has('S')) dy -= spd;
-      if (dx !== 0 || dy !== 0) {
-        const vw = window.innerWidth, vh = window.innerHeight;
-        setPan(p => ({
-          x: Math.min(vw * 0.4, Math.max(-(SVG_W - vw), p.x + dx)),
-          y: Math.min(vh * 0.3, Math.max(-(SVG_H - vh), p.y + dy)),
-        }));
-      }
-      raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Re-center on window resize
-  useEffect(() => {
-    const onResize = () => setPan(panToCenter(FIELD_ANCHOR));
+    const onResize = () => setView(computeView());
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
@@ -798,61 +713,7 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     setTimeout(() => setParticles(ps => ps.filter(p => !newPs.find(n => n.id === p.id))), 1200);
   }, [collectAllReady]);
 
-  // Pan handlers — pan deltas are accumulated in a ref and flushed at most
-  // once per animation frame to avoid one React re-render per mousemove event
-  // (which can fire faster than the display refresh rate, e.g. 240Hz mice).
-  const pendingPan = useRef<{ dx: number; dy: number } | null>(null);
-  const panRafRef  = useRef<number>(0);
-
-  const flushPan = useCallback(() => {
-    panRafRef.current = 0;
-    const p = pendingPan.current;
-    if (!p) return;
-    pendingPan.current = null;
-    const { dx, dy } = p;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    setPan(prev => ({
-      x: Math.min(vw * 0.4, Math.max(-(SVG_W - vw), prev.x + dx)),
-      y: Math.min(vh * 0.3, Math.max(-(SVG_H - vh), prev.y + dy)),
-    }));
-  }, []);
-
-  const onPtrDown = (e: React.PointerEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.closest?.('[data-world-control="true"]')) return;
-
-    ptrDown.current = true; dragDist.current = 0;
-    lastXY.current = { x: e.clientX, y: e.clientY };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-  const onPtrMove = (e: React.PointerEvent) => {
-    if (!ptrDown.current) return;
-    const dx = e.clientX - lastXY.current.x;
-    const dy = e.clientY - lastXY.current.y;
-    lastXY.current = { x: e.clientX, y: e.clientY };
-    dragDist.current += Math.abs(dx) + Math.abs(dy);
-
-    if (pendingPan.current) {
-      pendingPan.current.dx += dx;
-      pendingPan.current.dy += dy;
-    } else {
-      pendingPan.current = { dx, dy };
-    }
-    if (!panRafRef.current) {
-      panRafRef.current = requestAnimationFrame(flushPan);
-    }
-  };
-  const onPtrUp = () => {
-    ptrDown.current = false;
-    // Flush any pending delta on release so we don't leave the world in
-    // a half-updated position.
-    if (panRafRef.current) {
-      cancelAnimationFrame(panRafRef.current);
-      panRafRef.current = 0;
-      flushPan();
-    }
-  };
+  // Pan / pointer handlers removed — map is static now.
 
   // ── VIEWPORT CULLING ──────────────────────────────────────────────────────────
   const vpW = typeof window !== 'undefined' ? window.innerWidth  : 1280;
@@ -1146,11 +1007,7 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     <div
       ref={vpRef}
       className="world-viewport"
-      onPointerDown={onPtrDown}
-      onPointerMove={onPtrMove}
-      onPointerUp={onPtrUp}
-      onPointerCancel={onPtrUp}
-      style={{ cursor: ptrDown.current ? 'grabbing' : 'grab' }}
+      style={{ cursor: 'default' }}
     >
       {/* ── Sky strip ── */}
       <div style={{
@@ -1319,6 +1176,11 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
               <feMerge><feMergeNode in="offsetBlur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
           </defs>
+
+          {/* Single grass background rect — replaces what used to be 700+ per-tile
+              grass polygons. The browser tiles the SVG pattern once for the
+              whole canvas, so the visual texture is back without the GPU cost. */}
+          <rect x="0" y="0" width={SVG_W} height={SVG_H} fill="url(#grassPat)" />
 
           {/* Render all items */}
           {items.map((item, i) => {
@@ -2109,49 +1971,7 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
         </button>
       )}
 
-      {/* ── Navigation toggle ── */}
-      <div style={{
-        position: 'absolute', bottom: 80, right: 12,
-        display: 'flex', flexDirection: 'column', gap: 6,
-        pointerEvents: 'auto', zIndex: 30,
-      }}>
-        <button
-          data-world-control="true"
-          onPointerDown={event => event.stopPropagation()}
-          onClick={() => { setViewMode('field'); const p = panToCenter(FIELD_ANCHOR); animatePan(p.x, p.y); }}
-          style={{
-            width: 44, height: 44, borderRadius: 14,
-            background: viewMode === 'field'
-              ? 'linear-gradient(180deg, #34d399, #15803d)'
-              : 'linear-gradient(180deg, rgba(45,61,75,0.92), rgba(15,23,42,0.92))',
-            border: `1px solid ${viewMode === 'field' ? 'rgba(187,247,208,0.72)' : 'rgba(148,163,184,0.24)'}`,
-            color: 'white', fontSize: 18, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 10px 22px rgba(2,6,23,0.26), inset 0 1px 0 rgba(255,255,255,0.2)',
-          }}
-          title="Go to fields"
-        >🌾</button>
-        <button
-          data-world-control="true"
-          onPointerDown={event => event.stopPropagation()}
-          onClick={() => {
-            setViewMode('depot');
-            const p = panToCenter(DEPOT_ANCHOR);
-            animatePan(p.x, p.y);
-          }}
-          style={{
-            width: 44, height: 44, borderRadius: 14,
-            background: viewMode === 'depot'
-              ? 'linear-gradient(180deg, #fbbf24, #b45309)'
-              : 'linear-gradient(180deg, rgba(45,61,75,0.92), rgba(15,23,42,0.92))',
-            border: `1px solid ${viewMode === 'depot' ? 'rgba(254,240,138,0.72)' : 'rgba(148,163,184,0.24)'}`,
-            color: 'white', fontSize: 18, cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 10px 22px rgba(2,6,23,0.26), inset 0 1px 0 rgba(255,255,255,0.2)',
-          }}
-          title="Go to warehouse & market"
-        >🏚️</button>
-      </div>
+      {/* Navigation toggle removed — entire farm is visible at once now. */}
     </div>
   );
 }
