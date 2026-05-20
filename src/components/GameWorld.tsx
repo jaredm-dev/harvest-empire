@@ -245,20 +245,38 @@ function TruckSprite({ x, y, flip, moving, cargo }: {
   moving: boolean;
   cargo: number;
 }) {
+  // Cartoon farm pickup — blue body, yellow bed-liner cargo, big black wheels.
+  const bodyColor   = moving ? '#2563eb' : '#3b82f6';
+  const bodyShadow  = moving ? '#1e3a8a' : '#1e40af';
   return (
-    <g transform={`translate(${x},${y}) ${flip ? 'scale(-1,1) translate(-38,0)' : ''}`} style={{ pointerEvents: 'none' }} filter={IS_MOBILE ? undefined : 'url(#spriteLift)'}>
-      <path d="M0 29 C8 21 30 21 40 29 C30 36 9 36 0 29Z" fill="rgba(15,23,42,0.26)" />
-      <path d="M4 11 H23 L34 18 V28 H2 V16 Q2 11 4 11Z" fill={moving ? 'url(#truckBlueGrad)' : 'url(#truckIdleGrad)'} stroke="#172554" strokeWidth="1.2" />
-      <path d="M23 13 H31 L37 19 H24Z" fill="#bfdbfe" stroke="#1e3a8a" strokeWidth="1" />
-      <path d="M5 12 H22" stroke="rgba(255,255,255,0.4)" strokeWidth="1.4" strokeLinecap="round" />
-      <path d="M5 6 H20 L24 11 H4Z" fill="#facc15" stroke="#a16207" strokeWidth="1" />
-      <path d="M5 6 H20" stroke="#fef3c7" strokeWidth="1" opacity="0.8" />
-      <circle cx="9" cy="28" r="5" fill="#0f172a" />
-      <circle cx="29" cy="28" r="5" fill="#0f172a" />
-      <circle cx="9" cy="28" r="2.3" fill="#cbd5e1" />
-      <circle cx="29" cy="28" r="2.3" fill="#cbd5e1" />
+    <g transform={`translate(${x},${y}) ${flip ? 'scale(-1,1) translate(-44,0)' : ''}`} style={{ pointerEvents: 'none' }} filter={IS_MOBILE ? undefined : 'url(#spriteLift)'}>
+      {/* ground shadow */}
+      <ellipse cx="22" cy="31" rx="22" ry="3.5" fill="rgba(15,23,42,0.3)" />
+      {/* cargo bed (back) */}
+      <path d="M2 17 H22 V28 H2 Z" fill="#facc15" stroke="#1f2937" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M2 17 H22" stroke="#fde047" strokeWidth="1" opacity="0.8" />
+      {/* cab */}
+      <path d="M22 12 H34 Q38 12 38 16 V28 H22 Z" fill={bodyColor} stroke="#1f2937" strokeWidth="1.5" strokeLinejoin="round" />
+      {/* cab shadow / undercoat */}
+      <path d="M22 22 H38" stroke={bodyShadow} strokeWidth="3" />
+      {/* windshield */}
+      <path d="M25 14 H34 L36 19 H25 Z" fill="#bfdbfe" stroke="#1f2937" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M26 15 L29 16" stroke="#fff" strokeWidth="1" opacity="0.9" />
+      {/* headlight */}
+      <circle cx="37" cy="23" r="1.6" fill="#fde047" stroke="#1f2937" strokeWidth="0.7" />
+      {/* cargo content lump (if loaded) */}
       {cargo > 0 && (
-        <text x="20" y="2" fontSize="8" textAnchor="middle" fill="#fbbf24" fontWeight="bold" stroke="#111827" strokeWidth="1.5" paintOrder="stroke">
+        <path d="M4 14 Q12 10 20 14 L20 17 H4 Z" fill="#a16207" stroke="#1f2937" strokeWidth="1" />
+      )}
+      {/* wheels — big black with light hubcap */}
+      <circle cx="9" cy="28" r="5.4" fill="#0f172a" stroke="#000" strokeWidth="1" />
+      <circle cx="9" cy="28" r="2.6" fill="#cbd5e1" stroke="#475569" strokeWidth="0.7" />
+      <circle cx="9" cy="28" r="0.8" fill="#0f172a" />
+      <circle cx="31" cy="28" r="5.4" fill="#0f172a" stroke="#000" strokeWidth="1" />
+      <circle cx="31" cy="28" r="2.6" fill="#cbd5e1" stroke="#475569" strokeWidth="0.7" />
+      <circle cx="31" cy="28" r="0.8" fill="#0f172a" />
+      {cargo > 0 && (
+        <text x="20" y="6" fontSize="8" textAnchor="middle" fill="#fbbf24" fontWeight="bold" stroke="#111827" strokeWidth="1.5" paintOrder="stroke">
           {Math.floor(cargo)}u
         </text>
       )}
@@ -361,28 +379,30 @@ function AnimalSprite({ x, y, type, flip, moving }: {
     return (
       <g transform={outerT} style={{ pointerEvents: 'none' }}>
         <g className={animCls} filter={IS_MOBILE ? undefined : 'url(#spriteLift)'}>
-          {/* shadow */}
-          <path d="M-12 14 C-5 9 10 9 17 14 C9 19 -5 19 -12 14Z" fill="rgba(120,53,15,0.2)" />
-          {/* tail feathers */}
-          <path d="M-8 -2 C-15 -11 -21 -9 -17 -1 M-9 1 C-18 -4 -21 1 -14 5 M-8 4 C-15 10 -9 13 -5 6" fill="#f59e0b" stroke="#b45309" strokeWidth="0.7" />
-          {/* body */}
-          <ellipse cx="-1" cy="1" rx="10" ry="8.5" fill="url(#chickenBodyGrad)" stroke="#b45309" strokeWidth="0.8" />
-          {/* wing lines */}
-          <path d="M-7 0 Q-1 -4 6 1 Q-1 5 -7 0Z" fill="rgba(255,255,255,0.24)" stroke="#fbbf24" strokeWidth="0.7" />
-          {/* head */}
-          <circle cx="7" cy="-8" r="5.5" fill="#fef9c3" stroke="#d1d5db" strokeWidth="0.8" />
-          {/* comb */}
-          <path d="M5 -14 L6.5 -11 L8.5 -15 L10 -11.5 L12 -14" fill="#ef4444" stroke="#b91c1c" strokeWidth="0.5" />
+          {/* drop shadow */}
+          <ellipse cx="2" cy="15" rx="13" ry="3.5" fill="rgba(15,23,42,0.28)" />
+          {/* legs (orange, bold) */}
+          <path d="M-3 9 L-5 16" stroke="#ea7c1a" strokeWidth="2.2" strokeLinecap="round" />
+          <path d="M-7 16 L-3 16" stroke="#ea7c1a" strokeWidth="2.2" strokeLinecap="round" />
+          <path d="M4 9 L6 16" stroke="#ea7c1a" strokeWidth="2.2" strokeLinecap="round" />
+          <path d="M4 16 L8 16" stroke="#ea7c1a" strokeWidth="2.2" strokeLinecap="round" />
+          {/* tail (single curl) */}
+          <path d="M-10 -3 Q-17 -10 -13 -14 Q-7 -14 -8 -6" fill="#fff" stroke="#1f2937" strokeWidth="1.3" strokeLinejoin="round" />
+          {/* body — chunky teardrop */}
+          <path d="M-12 2 Q-13 -8 -3 -10 Q11 -10 12 3 Q12 11 -1 12 Q-12 11 -12 2Z" fill="#ffffff" stroke="#1f2937" strokeWidth="1.5" strokeLinejoin="round" />
+          {/* wing */}
+          <path d="M-7 -2 Q1 -7 8 -1 Q3 4 -7 1 Z" fill="#f5f5f5" stroke="#1f2937" strokeWidth="1.1" />
+          {/* head circle */}
+          <circle cx="8" cy="-11" r="5.5" fill="#ffffff" stroke="#1f2937" strokeWidth="1.4" />
+          {/* comb — 3 bold red bumps */}
+          <path d="M3 -16 Q4 -19 6 -17 Q7 -20 9 -17 Q10 -20 12 -17 L12 -14 Q4 -14 3 -14 Z" fill="#dc2626" stroke="#7f1d1d" strokeWidth="1" strokeLinejoin="round" />
           {/* wattle */}
-          <path d="M10 -5 Q13 -2 11 -1 Q9 1 10 -2Z" fill="#ef4444" stroke="#b91c1c" strokeWidth="0.4" />
-          {/* beak */}
-          <path d="M12 -9 L18 -7 L12 -6Z" fill="#f59e0b" stroke="#b45309" strokeWidth="0.6" />
+          <path d="M10 -8 Q14 -5 11 -4 Q9 -5 10 -8 Z" fill="#dc2626" stroke="#7f1d1d" strokeWidth="0.9" />
+          {/* beak — bright orange triangle */}
+          <path d="M11 -11 L17 -10 L11 -8 Z" fill="#f59e0b" stroke="#1f2937" strokeWidth="1" strokeLinejoin="round" />
           {/* eye */}
-          <circle cx="9" cy="-9" r="1.4" fill="#111827" />
-          <circle cx="9.4" cy="-9.5" r="0.5" fill="white" />
-          {/* legs */}
-          <path d="M3 8 L2 14 M2 14 L-1 17 M2 14 L4 17" stroke="#f59e0b" strokeWidth="1.4" strokeLinecap="round" />
-          <path d="M-3 8 L-4 14 M-4 14 L-7 17 M-4 14 L-2 17" stroke="#f59e0b" strokeWidth="1.4" strokeLinecap="round" />
+          <circle cx="8" cy="-12" r="1.6" fill="#1f2937" />
+          <circle cx="8.5" cy="-12.5" r="0.55" fill="#fff" />
         </g>
       </g>
     );
@@ -391,42 +411,37 @@ function AnimalSprite({ x, y, type, flip, moving }: {
   return (
     <g transform={outerT} style={{ pointerEvents: 'none' }}>
         <g className={animCls} filter={IS_MOBILE ? undefined : 'url(#spriteLift)'}>
-        {/* shadow */}
-        <path d="M-27 24 C-13 14 17 14 31 24 C17 34 -12 34 -27 24Z" fill="rgba(15,23,42,0.22)" />
-        {/* body */}
-        <path d="M-20 -2 Q-13 -11 3 -9 Q18 -8 20 4 Q21 17 8 20 L-13 20 Q-23 16 -22 5 Q-22 1 -20 -2Z" fill="url(#cowBodyGrad)" stroke="#64748b" strokeWidth="1.2" />
-        <path d="M-15 -4 Q-4 -10 12 -5" stroke="rgba(255,255,255,0.66)" strokeWidth="1.6" fill="none" strokeLinecap="round" />
-        {/* spots */}
-        <ellipse cx="-4" cy="3" rx="6" ry="5" fill="#374151" opacity="0.6" />
-        <ellipse cx="8" cy="9" rx="4.5" ry="3.5" fill="#374151" opacity="0.5" />
-        {/* udder */}
-        <ellipse cx="-6" cy="18" rx="6.5" ry="4" fill="#fda4af" stroke="#f9a8d4" strokeWidth="0.7" />
-        {/* tail */}
-        <path d="M-19 3 Q-30 -1 -27 -11 Q-25 -17 -28 -20" fill="none" stroke="#9ca3af" strokeWidth="1.5" strokeLinecap="round" />
-        <circle cx="-28" cy="-21" r="3" fill="#9ca3af" />
+        {/* drop shadow */}
+        <ellipse cx="0" cy="26" rx="24" ry="5" fill="rgba(15,23,42,0.28)" />
+        {/* legs — chunky dark with hooves */}
+        <rect x="-15" y="14" width="5" height="14" rx="1.5" fill="#0f172a" stroke="#000" strokeWidth="0.8" />
+        <rect x="-6" y="14" width="5" height="14" rx="1.5" fill="#0f172a" stroke="#000" strokeWidth="0.8" />
+        <rect x="3" y="14" width="5" height="14" rx="1.5" fill="#0f172a" stroke="#000" strokeWidth="0.8" />
+        <rect x="11" y="14" width="5" height="14" rx="1.5" fill="#0f172a" stroke="#000" strokeWidth="0.8" />
+        {/* belly underside (pink) */}
+        <path d="M-15 14 Q-5 19 15 14 L13 19 Q-3 22 -13 19 Z" fill="#fda4af" stroke="#9f1239" strokeWidth="1.1" strokeLinejoin="round" />
+        {/* body — fat white blob */}
+        <path d="M-20 0 Q-21 -10 -8 -12 Q18 -13 22 0 Q22 14 8 16 Q-14 16 -20 11 Q-22 7 -20 0 Z" fill="#ffffff" stroke="#1f2937" strokeWidth="1.6" strokeLinejoin="round" />
+        {/* big black patches (2 bold) */}
+        <path d="M-13 -6 Q-7 -10 0 -8 Q5 -3 -2 1 Q-12 3 -14 -3 Z" fill="#0f172a" stroke="#000" strokeWidth="0.6" />
+        <path d="M8 5 Q15 1 18 6 Q19 12 12 13 Q5 12 5 9 Q5 6 8 5 Z" fill="#0f172a" stroke="#000" strokeWidth="0.6" />
+        {/* tail with tuft */}
+        <path d="M-19 -2 Q-28 -4 -27 -13 Q-26 -19 -29 -22" fill="none" stroke="#1f2937" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="-29" cy="-22" r="3" fill="#1f2937" />
         {/* head */}
-        <circle cx="17" cy="-8" r="9.5" fill="#f8fafc" stroke="#64748b" strokeWidth="1.2" />
+        <ellipse cx="20" cy="-7" rx="10" ry="9" fill="#ffffff" stroke="#1f2937" strokeWidth="1.6" />
         {/* ear */}
-        <ellipse cx="11" cy="-16" rx="3.5" ry="5" fill="#fda4af" stroke="#64748b" strokeWidth="0.8" transform="rotate(-20 11 -16)" />
-        {/* horns */}
-        <path d="M13 -17 Q8 -27 12 -25" fill="none" stroke="#a16207" strokeWidth="2" strokeLinecap="round" />
-        <path d="M22 -17 Q28 -26 24 -24" fill="none" stroke="#a16207" strokeWidth="2" strokeLinecap="round" />
-        {/* muzzle */}
-        <ellipse cx="24" cy="-5" rx="6.5" ry="5" fill="#fda4af" stroke="#f9a8d4" strokeWidth="0.8" />
-        <circle cx="22" cy="-4" r="1.1" fill="#9d174d" />
-        <circle cx="26" cy="-4" r="1.1" fill="#9d174d" />
+        <ellipse cx="13" cy="-16" rx="3" ry="5" fill="#0f172a" stroke="#000" strokeWidth="0.6" transform="rotate(-25 13 -16)" />
+        {/* horns — single curve each */}
+        <path d="M15 -16 Q11 -22 16 -22" fill="none" stroke="#fbbf24" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M24 -16 Q28 -22 24 -22" fill="none" stroke="#fbbf24" strokeWidth="2.4" strokeLinecap="round" />
+        {/* muzzle — big pink oval */}
+        <ellipse cx="26" cy="-3" rx="7" ry="5.5" fill="#fda4af" stroke="#9f1239" strokeWidth="1.2" />
+        <ellipse cx="24" cy="-3" rx="1" ry="1.4" fill="#831843" />
+        <ellipse cx="28" cy="-3" rx="1" ry="1.4" fill="#831843" />
         {/* eye */}
-        <circle cx="18" cy="-10" r="1.6" fill="#111827" />
-        <circle cx="18.5" cy="-10.5" r="0.55" fill="white" />
-        {/* legs with hooves */}
-        <path d="M5 17 L4 29" stroke="#374151" strokeWidth="3.5" strokeLinecap="round" />
-        <rect x="2" y="27" width="5" height="3" rx="1" fill="#111827" />
-        <path d="M13 17 L13 29" stroke="#374151" strokeWidth="3.5" strokeLinecap="round" />
-        <rect x="11" y="27" width="5" height="3" rx="1" fill="#111827" />
-        <path d="M-7 17 L-8 29" stroke="#374151" strokeWidth="3.5" strokeLinecap="round" />
-        <rect x="-10" y="27" width="5" height="3" rx="1" fill="#111827" />
-        <path d="M-15 17 L-16 29" stroke="#374151" strokeWidth="3.5" strokeLinecap="round" />
-        <rect x="-18" y="27" width="5" height="3" rx="1" fill="#111827" />
+        <circle cx="21" cy="-9" r="1.9" fill="#0f172a" />
+        <circle cx="21.6" cy="-9.7" r="0.7" fill="#fff" />
       </g>
     </g>
   );
@@ -490,39 +505,56 @@ function HarvesterSprite({ x, y, type, flip = false, active = false }: {
   flip?: boolean;
   active?: boolean;
 }) {
-  const color = ({ basic: '#f97316', advanced: '#16a34a', industrial: '#eab308', mega: '#a855f7' } as const)[type];
-  const dark = ({ basic: '#c2410c', advanced: '#15803d', industrial: '#a16207', mega: '#7e22ce' } as const)[type];
-  const sz    = ({ basic: 0.66, advanced: 0.82, industrial: 1.0, mega: 1.2 } as const)[type];
+  // Bold cartoon-combine palette. Basic = farm red, then yellow/green/purple tiers.
+  const color  = ({ basic: '#dc2626', advanced: '#16a34a', industrial: '#eab308', mega: '#a855f7' } as const)[type];
+  const accent = ({ basic: '#fef08a', advanced: '#fef3c7', industrial: '#1f2937', mega: '#fde68a' } as const)[type];
+  const dark   = ({ basic: '#7f1d1d', advanced: '#15803d', industrial: '#a16207', mega: '#6d28d9' } as const)[type];
+  const sz     = ({ basic: 0.7, advanced: 0.85, industrial: 1.0, mega: 1.2 } as const)[type];
   return (
     <g transform={`translate(${x},${y}) scale(${flip ? -sz : sz},${sz})`} style={{ pointerEvents: 'none' }} filter={IS_MOBILE ? undefined : 'url(#spriteLift)'}>
-      <path d="M-25 16 C-12 7 17 7 29 16 C15 25 -12 25 -25 16Z" fill="rgba(15,23,42,0.25)" />
+      {/* drop shadow */}
+      <ellipse cx="2" cy="16" rx="24" ry="4" fill="rgba(15,23,42,0.28)" />
+      {/* Cutting header bar (front left) */}
+      <path d="M-26 4 H-14 V11 H-26 Z" fill={accent} stroke="#1f2937" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M-26 8 H-14" stroke="#1f2937" strokeWidth="0.7" />
+      {/* small reel teeth on the header */}
+      <path d="M-25 4 L-25 1 M-22 4 L-22 1 M-19 4 L-19 1 M-16 4 L-16 1" stroke="#1f2937" strokeWidth="1" strokeLinecap="round" />
+      {/* dust kicks behind cutter when active */}
       {active && (
-        <g opacity="0.72">
-          <path d="M-24 4 C-35 0 -38 13 -27 17" fill="none" stroke="#d6d3d1" strokeWidth="2" strokeLinecap="round" />
-          <path d="M-29 9 C-40 7 -43 18 -32 21" fill="none" stroke="#fef3c7" strokeWidth="1.5" strokeLinecap="round" />
+        <g opacity="0.65">
+          <circle cx="-29" cy="6"  r="2.4" fill="#e7e5e4" />
+          <circle cx="-31" cy="11" r="2.0" fill="#e7e5e4" />
+          <circle cx="-28" cy="13" r="1.8" fill="#e7e5e4" />
         </g>
       )}
-      {/* Body */}
-      <path d="M-15 -7 H11 L19 0 V11 H-17 V-2 Q-17 -7 -15 -7Z" fill={color} stroke="#111827" strokeWidth="1" />
-      <path d="M-15 3 H19 V11 H-17 V5Z" fill={dark} opacity="0.42" />
+      {/* Body / chassis */}
+      <path d="M-14 -6 H14 Q18 -6 18 -2 V11 H-14 Z" fill={color} stroke="#1f2937" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M-14 4 H18" stroke={dark} strokeWidth="2.2" opacity="0.9" />
       {/* Cabin */}
-      <path d="M-5 -21 H8 L13 -8 H-9Z" fill={color} stroke="#111827" strokeWidth="0.9" />
-      {/* Windshield */}
-      <path d="M-3 -18 H7 L10 -10 H-6Z" fill="#bfdbfe" stroke="#93c5fd" strokeWidth="0.6" />
-      <path d="M-14 -6 H9" stroke="rgba(255,255,255,0.42)" strokeWidth="1.5" strokeLinecap="round" />
-      {/* Exhaust */}
-      <rect x="10" y="-26" width="3.5" height="9" rx="1.5" fill="#374151" />
-      <ellipse cx="11.75" cy="-26" rx="2.5" ry="1" fill="#6b7280" />
-      {/* Rear wheels (big) */}
-      <circle cx="-9" cy="10" r="7.5" fill="#111827" stroke="#020617" strokeWidth="1" />
-      <circle cx="-9" cy="10" r="3.2" fill="#94a3b8" />
-      <circle cx="10"  cy="10" r="7.5" fill="#111827" stroke="#020617" strokeWidth="1" />
-      <circle cx="10"  cy="10" r="3.2" fill="#94a3b8" />
-      {/* Front wheels (small) */}
-      <circle cx="-8" cy="-2" r="4" fill="#1f2937" stroke="#111827" strokeWidth="0.8" />
-      <circle cx="8"  cy="-2" r="4" fill="#1f2937" stroke="#111827" strokeWidth="0.8" />
+      <path d="M-4 -19 H10 Q12 -19 12 -16 L13 -7 H-7 Z" fill={color} stroke="#1f2937" strokeWidth="1.3" strokeLinejoin="round" />
+      {/* Windshield big */}
+      <path d="M-2 -17 H9 L11 -9 H-5 Z" fill="#bfdbfe" stroke="#1f2937" strokeWidth="1" strokeLinejoin="round" />
+      <path d="M-1 -16 L4 -14" stroke="#fff" strokeWidth="0.9" opacity="0.9" />
+      {/* Exhaust stack */}
+      <rect x="13" y="-24" width="3.5" height="10" rx="1.5" fill="#1f2937" stroke="#000" strokeWidth="0.6" />
+      <ellipse cx="14.75" cy="-24" rx="3" ry="1.1" fill="#475569" />
       {active && (
-        <path d="M-20 8 L-31 1 M-20 12 L-33 12 M-20 16 L-31 23" stroke="#a16207" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="14.75" cy="-28" r="2.2" fill="#475569" opacity="0.5" />
+      )}
+      {/* Rear wheels (big black with hubcap) */}
+      <circle cx="-8" cy="11" r="7.6" fill="#0f172a" stroke="#000" strokeWidth="1" />
+      <circle cx="-8" cy="11" r="3.4" fill="#cbd5e1" stroke="#475569" strokeWidth="0.7" />
+      <circle cx="-8" cy="11" r="1"   fill="#0f172a" />
+      <circle cx="11"  cy="11" r="7.6" fill="#0f172a" stroke="#000" strokeWidth="1" />
+      <circle cx="11"  cy="11" r="3.4" fill="#cbd5e1" stroke="#475569" strokeWidth="0.7" />
+      <circle cx="11"  cy="11" r="1"   fill="#0f172a" />
+      {/* wheat-spray when actively cutting */}
+      {active && (
+        <g opacity="0.85">
+          <path d="M-13 8 L-22 5"  stroke="#f59e0b" strokeWidth="2"   strokeLinecap="round" />
+          <path d="M-13 11 L-24 11" stroke="#f59e0b" strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M-13 14 L-22 17" stroke="#f59e0b" strokeWidth="2"   strokeLinecap="round" />
+        </g>
       )}
     </g>
   );
