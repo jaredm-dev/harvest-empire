@@ -83,6 +83,28 @@ const ROAD_ROW_END   = 14;
 const SERVICE_ROAD_ROWS = [6, 14, 22];
 const SERVICE_ROAD_COLS = [6, 14, 22];
 
+// World boundary (perimeter fence). The fence sits at these col/row indices
+// and nothing — buildings, fields, roads, animals — should ever be outside.
+const PERIM_MIN_COL = -4;
+const PERIM_MAX_COL = 32;
+const PERIM_MIN_ROW = -2;
+const PERIM_MAX_ROW = 24;
+
+// Inverse of iso(): screen-world (x, y) -> (col, row). Used to check whether
+// an animal would step past the fence.
+const worldToIso = (x: number, y: number) => ({
+  col: ((x - 700) / 36 + (y - 140) / 18) / 2,
+  row: ((y - 140) / 18 - (x - 700) / 36) / 2,
+});
+
+const isInsidePerimeter = (x: number, y: number) => {
+  const { col, row } = worldToIso(x, y);
+  return col > PERIM_MIN_COL + 0.5
+      && col < PERIM_MAX_COL - 0.5
+      && row > PERIM_MIN_ROW + 0.5
+      && row < PERIM_MAX_ROW - 0.5;
+};
+
 // ── ISO MATH ───────────────────────────────────────────────────────────────────
 const iso = (col: number, row: number) => ({
   x: OX + (col - row) * HW,
@@ -320,19 +342,28 @@ const DECOR_TILES = [
 const isInObstacle = (x: number, y: number, obstacles: WorldObstacle[]) =>
   obstacles.some(o => x >= o.x1 && x <= o.x2 && y >= o.y1 && y <= o.y2);
 
-const clampAnimal = (a: AnimalAI) => ({
-  ...a,
-  x: Math.max(WANDER.x1, Math.min(WANDER.x2, a.x)),
-  y: Math.max(WANDER.y1, Math.min(WANDER.y2, a.y)),
-});
+// Animals are clamped to (a) the legacy WANDER rect AND (b) the perimeter
+// fence diamond. Both must be satisfied, so they can never wander beyond
+// the wooden boundary.
+const clampAnimal = (a: AnimalAI) => {
+  let nx = Math.max(WANDER.x1, Math.min(WANDER.x2, a.x));
+  let ny = Math.max(WANDER.y1, Math.min(WANDER.y2, a.y));
+  // Walk back toward the world center until we're inside the fence.
+  let safety = 8;
+  while (!isInsidePerimeter(nx, ny) && safety-- > 0) {
+    nx = nx * 0.8 + 700 * 0.2;
+    ny = ny * 0.8 + 590 * 0.2;
+  }
+  return { ...a, x: nx, y: ny };
+};
 
 const randTarget = (obstacles: WorldObstacle[] = []) => {
   for (let attempt = 0; attempt < 30; attempt++) {
     const tx = WANDER.x1 + Math.random() * (WANDER.x2 - WANDER.x1);
     const ty = WANDER.y1 + Math.random() * (WANDER.y2 - WANDER.y1);
-    if (!isInObstacle(tx, ty, obstacles)) return { tx, ty };
+    if (!isInObstacle(tx, ty, obstacles) && isInsidePerimeter(tx, ty)) return { tx, ty };
   }
-  return { tx: 300, ty: 650 };
+  return { tx: 700, ty: 590 };
 };
 
 function makeInitialAnimals(obstacles: WorldObstacle[] = []): AnimalAI[] {
@@ -358,7 +389,9 @@ function stepAnimals(animals: AnimalAI[], delta: number, obstacles: WorldObstacl
     const spd = ASPEED[a.type];
     const nx = a.x + (dx / dist) * spd * delta;
     const ny = a.y + (dy / dist) * spd * delta;
-    if (isInObstacle(nx, ny, obstacles)) {
+    // If the next step would put the animal inside a building OR outside the
+    // perimeter fence, pick a new target instead of stepping through it.
+    if (isInObstacle(nx, ny, obstacles) || !isInsidePerimeter(nx, ny)) {
       return clampAnimal({ ...a, ...randTarget(obstacles), moving: false, idleTimer: 0.4 + Math.random() * 1.4 });
     }
     return clampAnimal({ ...a, x: nx, y: ny, flip: dx < 0 });
@@ -778,15 +811,14 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     if (isTileVisible(ROAD_COL, r))     items.push({ kind: 'road', col: ROAD_COL,     row: r });
     if (isTileVisible(ROAD_COL + 1, r)) items.push({ kind: 'road', col: ROAD_COL + 1, row: r });
   }
-  // Extended service roads — push the road network out past the playable
-  // area on each side so the empty grass doesn't end abruptly.
+  // Extended service roads — reach all the way to the fence on each side.
   SERVICE_ROAD_ROWS.forEach(row => {
-    for (let c = -4; c <= ROAD_COL + 4; c++) {
+    for (let c = PERIM_MIN_COL + 1; c <= PERIM_MAX_COL - 1; c++) {
       if (!fieldOccupiesTile(c, row) && isTileVisible(c, row)) items.push({ kind: 'road', col: c, row });
     }
   });
   SERVICE_ROAD_COLS.forEach(col => {
-    for (let r = -4; r <= 26; r++) {
+    for (let r = PERIM_MIN_ROW + 1; r <= PERIM_MAX_ROW - 1; r++) {
       if (!fieldOccupiesTile(col, r) && isTileVisible(col, r)) items.push({ kind: 'road', col, row: r });
     }
   });
@@ -836,13 +868,9 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
       items.push({ kind: 'parkedHarvester', htype: harvester.type, idx });
     });
 
-  // Perimeter fence — a clean wooden border that wraps around the whole
-  // playable area. Frames the farm so the empty grass beyond looks like
-  // intentional pasture, not unused canvas.
-  const PERIM_MIN_COL = -2;
-  const PERIM_MAX_COL = 30;
-  const PERIM_MIN_ROW = 0;
-  const PERIM_MAX_ROW = 22;
+  // Perimeter fence — pushed outward so it doesn't crowd the buildings/fields.
+  // The fence is the canonical world boundary; nothing (animals included)
+  // can leave it.
   for (let c = PERIM_MIN_COL; c <= PERIM_MAX_COL; c++) {
     if (isTileVisible(c, PERIM_MIN_ROW)) {
       items.push({ kind: 'fence', col: c, row: PERIM_MIN_ROW, side: 'NW' });
