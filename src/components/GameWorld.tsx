@@ -197,7 +197,7 @@ function CropSprite({ field, col, row, plantIndex }: {
 function TreeSprite({ x, y, variant = 0 }: { x: number; y: number; variant?: number }) {
   const tint = ['#22c55e', '#65a30d', '#4d7c0f'][variant % 3];
   return (
-    <g transform={`translate(${x},${y})`} style={{ pointerEvents: 'none' }} filter={IS_MOBILE ? undefined : 'url(#spriteLift)'}>
+    <g transform={`translate(${x},${y})`} style={{ pointerEvents: 'none' }}>
       <path d="M-18 15 C-8 8 10 8 22 15 C13 22 -8 23 -18 15Z" fill="rgba(20,83,45,0.22)" />
       <path d="M-5 13 C-4 2 -3 -12 0 -21 C4 -10 7 2 8 13Z" fill="#8b5a2b" stroke="#5c3516" strokeWidth="1" />
       <path d="M-3 -16 C-17 -18 -24 -31 -12 -41 C-5 -51 7 -47 8 -37 C22 -42 36 -31 29 -17 C36 -6 19 4 6 -3 C-5 9 -25 3 -21 -11 C-25 -17 -16 -25 -3 -16Z"
@@ -228,7 +228,7 @@ function FlowerClump({ x, y }: { x: number; y: number }) {
 
 function HayBale({ x, y }: { x: number; y: number }) {
   return (
-    <g transform={`translate(${x},${y})`} style={{ pointerEvents: 'none' }} filter={IS_MOBILE ? undefined : 'url(#spriteLift)'}>
+    <g transform={`translate(${x},${y})`} style={{ pointerEvents: 'none' }}>
       <path d="M-17 13 C-8 7 10 7 18 13 C9 19 -8 20 -17 13Z" fill="rgba(120,53,15,0.24)" />
       <path d="M-16 -6 H10 L17 0 V11 H-16Z" fill="url(#hayGrad)" stroke="#92400e" strokeWidth="1" />
       <path d="M10 -6 L17 0 L17 11 L10 6Z" fill="#ca8a04" stroke="#92400e" strokeWidth="0.8" />
@@ -249,7 +249,7 @@ function TruckSprite({ x, y, flip, moving, cargo }: {
   const bodyColor   = moving ? '#2563eb' : '#3b82f6';
   const bodyShadow  = moving ? '#1e3a8a' : '#1e40af';
   return (
-    <g transform={`translate(${x},${y}) ${flip ? 'scale(-1,1) translate(-44,0)' : ''}`} style={{ pointerEvents: 'none' }} filter={IS_MOBILE ? undefined : 'url(#spriteLift)'}>
+    <g transform={`translate(${x},${y}) ${flip ? 'scale(-1,1) translate(-44,0)' : ''}`} style={{ pointerEvents: 'none' }}>
       {/* ground shadow */}
       <ellipse cx="22" cy="31" rx="22" ry="3.5" fill="rgba(15,23,42,0.3)" />
       {/* cargo bed (back) */}
@@ -378,7 +378,7 @@ function AnimalSprite({ x, y, type, flip, moving }: {
   if (type === 'chicken') {
     return (
       <g transform={outerT} style={{ pointerEvents: 'none' }}>
-        <g className={animCls} filter={IS_MOBILE ? undefined : 'url(#spriteLift)'}>
+        <g className={animCls}>
           {/* drop shadow */}
           <ellipse cx="2" cy="15" rx="13" ry="3.5" fill="rgba(15,23,42,0.28)" />
           {/* legs (orange, bold) */}
@@ -410,7 +410,7 @@ function AnimalSprite({ x, y, type, flip, moving }: {
 
   return (
     <g transform={outerT} style={{ pointerEvents: 'none' }}>
-        <g className={animCls} filter={IS_MOBILE ? undefined : 'url(#spriteLift)'}>
+        <g className={animCls}>
         {/* drop shadow */}
         <ellipse cx="0" cy="26" rx="24" ry="5" fill="rgba(15,23,42,0.28)" />
         {/* legs — chunky dark with hooves */}
@@ -511,7 +511,7 @@ function HarvesterSprite({ x, y, type, flip = false, active = false }: {
   const dark   = ({ basic: '#7f1d1d', advanced: '#15803d', industrial: '#a16207', mega: '#6d28d9' } as const)[type];
   const sz     = ({ basic: 0.7, advanced: 0.85, industrial: 1.0, mega: 1.2 } as const)[type];
   return (
-    <g transform={`translate(${x},${y}) scale(${flip ? -sz : sz},${sz})`} style={{ pointerEvents: 'none' }} filter={IS_MOBILE ? undefined : 'url(#spriteLift)'}>
+    <g transform={`translate(${x},${y}) scale(${flip ? -sz : sz},${sz})`} style={{ pointerEvents: 'none' }}>
       {/* drop shadow */}
       <ellipse cx="2" cy="16" rx="24" ry="4" fill="rgba(15,23,42,0.28)" />
       {/* Cutting header bar (front left) */}
@@ -563,7 +563,7 @@ function HarvesterSprite({ x, y, type, flip = false, active = false }: {
 // ── FIELD CART SPRITE ─────────────────────────────────────────────────────────
 function FieldCartSprite({ x, y, flip }: { x: number; y: number; flip: boolean }) {
   return (
-    <g transform={`translate(${x},${y}) scale(${flip ? -1 : 1},1)`} style={{ pointerEvents: 'none' }} filter={IS_MOBILE ? undefined : 'url(#spriteLift)'}>
+    <g transform={`translate(${x},${y}) scale(${flip ? -1 : 1},1)`} style={{ pointerEvents: 'none' }}>
       <path d="M-23 13 C-10 5 14 5 25 13 C12 21 -9 21 -23 13Z" fill="rgba(15,23,42,0.22)" />
       {/* Tow hitch */}
       <rect x="-22" y="-1" width="10" height="4" rx="2" fill="#374151" />
