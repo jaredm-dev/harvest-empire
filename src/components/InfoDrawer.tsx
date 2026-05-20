@@ -184,6 +184,18 @@ export function MarketDrawer({ open, onClose }: { open: boolean; onClose: () => 
             </div>
           </div>
 
+          <div style={{
+            background: 'rgba(129,178,154,0.12)',
+            border: '1px solid rgba(129,178,154,0.35)',
+            borderRadius: 12, padding: '10px 12px', marginBottom: 12,
+            color: 'var(--ink-dim)', fontSize: 12, lineHeight: 1.45,
+          }}>
+            <b style={{ color: 'var(--sage)' }}>How trucks work:</b> trucks
+            pull crops from your warehouse and drive them to market, paying
+            up to <b>2.7× more per unit</b> than selling from the warehouse.
+            They run automatically — buy more in the Shop to multiply income.
+          </div>
+
           <MarketOrderBoard />
 
           <FleetPanel />

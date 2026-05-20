@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { throttledStorage } from './utils/throttled-storage';
 import type { GameStore, Field, Harvester, Warehouse, Truck, CropType, FieldIssue, Toast, FieldCart, MarketOrder, GameEvent, EventType, DailyMission } from './types';
 import {
   CROP_CONFIG, FIELD_CONFIG, HARVESTER_CONFIG, WAREHOUSE_CONFIG, TRUCK_CONFIG,
@@ -15,34 +16,45 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const ORDER_NAMES = ['Sunrise Cafe', 'County Fair', 'Bakery Guild', 'Riverside Inn', 'Chef Mira', 'Harvest Club'];
 const ORDER_TITLES = ['Fresh crate', 'Kitchen restock', 'Festival bundle', 'Chef request', 'Town delivery', 'Pantry fill'];
 
-const generateMarketOrders = (unlockedCrops: CropType[], prestigeLevel: number): MarketOrder[] => {
+const RARITY_POOL: Array<MarketOrder['rarity']> = ['standard', 'standard', 'premium', 'rush'];
+const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+const generateOneOrder = (unlockedCrops: CropType[], prestigeLevel: number): MarketOrder => {
   const crops = unlockedCrops.length > 0 ? unlockedCrops : ['tomato' as CropType];
-  return Array.from({ length: 4 }, (_, index) => {
-    const rarity: MarketOrder['rarity'] = index === 0 ? 'standard' : index === 1 ? 'premium' : index === 2 ? 'rush' : 'standard';
-    const cropA = crops[(index + prestigeLevel) % crops.length];
-    const cropB = crops[(index + 1 + prestigeLevel) % crops.length];
-    const baseQty = rarity === 'rush' ? 10 + prestigeLevel * 4 : rarity === 'premium' ? 16 + prestigeLevel * 6 : 8 + prestigeLevel * 3;
-    const requirements: Partial<Record<CropType, number>> = {
-      [cropA]: baseQty,
-    };
-    if (cropB !== cropA && rarity !== 'standard') requirements[cropB] = Math.ceil(baseQty * 0.55);
+  const rarity = pickRandom(RARITY_POOL);
+  const cropA = pickRandom(crops);
+  let cropB = pickRandom(crops);
+  // Try to avoid duplicate crop A/B
+  if (cropB === cropA && crops.length > 1) {
+    cropB = crops[(crops.indexOf(cropA) + 1) % crops.length];
+  }
+  const baseQty = rarity === 'rush' ? 10 + prestigeLevel * 4 : rarity === 'premium' ? 16 + prestigeLevel * 6 : 8 + prestigeLevel * 3;
+  const requirements: Partial<Record<CropType, number>> = {
+    [cropA]: baseQty,
+  };
+  if (cropB !== cropA && rarity !== 'standard') requirements[cropB] = Math.ceil(baseQty * 0.55);
 
-    const cropValue = Object.entries(requirements).reduce((sum, [crop, amount]) =>
-      sum + (amount || 0) * CROP_CONFIG[crop as CropType].baseValue,
-    0);
-    const premium = rarity === 'premium' ? 2.25 : rarity === 'rush' ? 2.7 : 1.85;
+  const cropValue = Object.entries(requirements).reduce((sum, [crop, amount]) =>
+    sum + (amount || 0) * CROP_CONFIG[crop as CropType].baseValue,
+  0);
+  // Rush is now the highest-value, premium is second, standard is base.
+  const valueMult = rarity === 'rush' ? 2.8 : rarity === 'premium' ? 2.2 : 1.85;
 
-    return {
-      id: uid(),
-      title: ORDER_TITLES[(index + prestigeLevel) % ORDER_TITLES.length],
-      customer: ORDER_NAMES[(index * 2 + prestigeLevel) % ORDER_NAMES.length],
-      requirements,
-      rewardMoney: Math.floor(cropValue * premium * getPrestigeMultiplier(prestigeLevel)),
-      rewardGems: rarity === 'premium' ? 2 : rarity === 'rush' ? 1 : 0,
-      expiresIn: rarity === 'rush' ? 900 : rarity === 'premium' ? 1800 : 2700,
-      rarity,
-    };
-  });
+  return {
+    id: uid(),
+    title: pickRandom(ORDER_TITLES),
+    customer: pickRandom(ORDER_NAMES),
+    requirements,
+    rewardMoney: Math.floor(cropValue * valueMult * getPrestigeMultiplier(prestigeLevel)),
+    // Rush > premium for gems (player feedback)
+    rewardGems: rarity === 'rush' ? 3 : rarity === 'premium' ? 1 : 0,
+    expiresIn: rarity === 'rush' ? 900 : rarity === 'premium' ? 1800 : 2700,
+    rarity,
+  };
+};
+
+const generateMarketOrders = (unlockedCrops: CropType[], prestigeLevel: number): MarketOrder[] => {
+  return Array.from({ length: 4 }, () => generateOneOrder(unlockedCrops, prestigeLevel));
 };
 
 const normalizeField = (field: Field): Field => ({
@@ -401,7 +413,7 @@ export const useGameStore = create<GameStore>()(
             lastSavedTime: Date.now(),
             marketOrders: (s.marketOrders?.length ? s.marketOrders : generateMarketOrders(s.unlockedCrops, s.prestigeLevel))
               .map(order => ({ ...order, expiresIn: Math.max(0, order.expiresIn - delta) }))
-              .map(order => order.expiresIn <= 0 ? generateMarketOrders(s.unlockedCrops, s.prestigeLevel)[0] : order),
+              .map(order => order.expiresIn <= 0 ? generateOneOrder(s.unlockedCrops, s.prestigeLevel) : order),
             toasts: [...s.toasts, ...newToasts].slice(-5),
           };
         });
@@ -625,7 +637,7 @@ export const useGameStore = create<GameStore>()(
           totalEarned: s.totalEarned + order.rewardMoney,
           marketOrdersCompleted: (s.marketOrdersCompleted || 0) + 1,
           dailyMissions: bumpMissions(bumpMissions(s.dailyMissions || [], 'complete_orders', 1), 'earn_money', order.rewardMoney),
-          marketOrders: orders.map(o => o.id === orderId ? generateMarketOrders(s.unlockedCrops, s.prestigeLevel)[0] : o),
+          marketOrders: orders.map(o => o.id === orderId ? generateOneOrder(s.unlockedCrops, s.prestigeLevel) : o),
           toasts: order.rewardGems
             ? [...s.toasts, { id: uid(), message: `+${order.rewardGems} gems`, type: 'success' as const }].slice(-5)
             : s.toasts,
@@ -1015,15 +1027,37 @@ export const useGameStore = create<GameStore>()(
 
         Sound.achievement();
         celebrate('medium');
+
+        // Generate a replacement mission so the player always has 3 active
+        // goals, instead of staring at a "Claimed" stub all day.
+        const existingTypes = new Set(
+          (state.dailyMissions || []).filter(m => m.id !== missionId && !m.claimed).map(m => m.type),
+        );
+        const candidates = MISSION_POOL.filter(p => !existingTypes.has(p.type));
+        const tpl = candidates.length > 0
+          ? candidates[Math.floor(Math.random() * candidates.length)]
+          : MISSION_POOL[Math.floor(Math.random() * MISSION_POOL.length)];
+        const replacement: DailyMission = {
+          id: uid(),
+          type: tpl.type,
+          target: tpl.target,
+          progress: 0,
+          rewardGems: tpl.rewardGems,
+          rewardMoney: tpl.rewardMoney,
+          claimed: false,
+          description: tpl.description,
+          emoji: tpl.emoji,
+        };
+
         set(s => ({
           gems: (s.gems ?? 0) + mission.rewardGems,
           money: s.money + mission.rewardMoney,
           dailyMissions: (s.dailyMissions || []).map(m =>
-            m.id === missionId ? { ...m, claimed: true } : m,
+            m.id === missionId ? replacement : m,
           ),
           toasts: [...s.toasts, {
             id: uid(),
-            message: `${mission.emoji} Mission claimed! +${mission.rewardGems} gems & ${formatMoney(mission.rewardMoney)}`,
+            message: `${mission.emoji} Mission claimed! +${mission.rewardGems}💎 & ${formatMoney(mission.rewardMoney)}`,
             type: 'success' as const,
           }].slice(-5),
         }));
@@ -1036,6 +1070,7 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: 'harvest-empire-v1',
+      storage: createJSONStorage(() => throttledStorage),
       partialize: (s) => ({
         money: s.money,
         gems: s.gems,

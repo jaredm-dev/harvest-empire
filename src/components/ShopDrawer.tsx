@@ -211,7 +211,9 @@ export default function ShopDrawer({ open, onClose }: { open: boolean; onClose: 
           {tab === 'storage' && (
             <>
               <p style={{ color: '#94a3b8', fontSize: 11, marginBottom: 10 }}>Bigger storage gives you more room before collecting stalls.</p>
-              {(Object.entries(WAREHOUSE_CONFIG) as [WarehouseType, typeof WAREHOUSE_CONFIG[WarehouseType]][]).map(([type, cfg]) => (
+              {(Object.entries(WAREHOUSE_CONFIG) as [WarehouseType, typeof WAREHOUSE_CONFIG[WarehouseType]][])
+                .filter(([type]) => type !== 'stand')
+                .map(([type, cfg]) => (
                 <ShopCard
                   key={type}
                   icon={cfg.emoji}

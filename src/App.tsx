@@ -88,7 +88,12 @@ export default function App() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    let paused = document.visibilityState === 'hidden';
     const loop = (now: number) => {
+      if (paused) {
+        rafRef.current = requestAnimationFrame(loop);
+        return;
+      }
       const delta = Math.min((now - lastTime.current) / 1000, 0.2);
       lastTime.current = now;
       accum.current += delta;
@@ -99,7 +104,22 @@ export default function App() {
       rafRef.current = requestAnimationFrame(loop);
     };
     rafRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafRef.current);
+
+    // Pause the simulation when the tab is hidden. Offline progress will
+    // catch the player up on return.
+    const onVisibilityChange = () => {
+      paused = document.visibilityState === 'hidden';
+      // Reset the time anchor so we don't fast-forward 30 minutes of
+      // simulation in one tick when we resume.
+      lastTime.current = performance.now();
+      accum.current = 0;
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
   }, [tick]);
 
   const close = () => setModal('none');

@@ -446,13 +446,27 @@ function AnimalsLayer({ obstacles }: { obstacles: WorldObstacle[] }) {
   useEffect(() => {
     let rafId: number;
     let frame = 0;
+    let lastPaint = 0;
+    // Cap the animal animation to ~20fps on mobile, 30fps on desktop. The
+    // simulation only needs subtle motion — running at 60fps was burning
+    // battery for no visible benefit.
+    const minPaintMs = IS_MOBILE ? 50 : 33;
     const loop = (now: number) => {
+      if (document.hidden) {
+        rafId = requestAnimationFrame(loop);
+        return;
+      }
+      if (now - lastPaint < minPaintMs) {
+        rafId = requestAnimationFrame(loop);
+        return;
+      }
+      lastPaint = now;
       if (lastRef.current === 0) lastRef.current = now;
       const delta = Math.min((now - lastRef.current) / 1000, 0.1);
       lastRef.current = now;
       stateRef.current = stepAnimals(stateRef.current, delta, obstaclesRef.current);
       frame++;
-      if (frame % (IS_MOBILE ? 6 : 3) === 0) setAnimals([...stateRef.current]);
+      if (frame % (IS_MOBILE ? 4 : 2) === 0) setAnimals([...stateRef.current]);
       rafId = requestAnimationFrame(loop);
     };
     rafId = requestAnimationFrame(loop);
@@ -666,8 +680,13 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
   useEffect(() => {
     let rafId = 0;
     let lastPaint = 0;
+    const minPaintMs = IS_MOBILE ? 400 : 160;
     const loop = (now: number) => {
-      if (now - lastPaint > (IS_MOBILE ? 250 : 120)) {
+      if (document.hidden) {
+        rafId = requestAnimationFrame(loop);
+        return;
+      }
+      if (now - lastPaint > minPaintMs) {
         setMachineClock(now);
         lastPaint = now;
       }
