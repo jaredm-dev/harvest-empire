@@ -706,6 +706,35 @@ export const useGameStore = create<GameStore>()(
         return true;
       },
 
+      // Sell a field for a partial refund (55% of original price). The
+      // starter field cannot be sold — players always need at least one.
+      // Any harvester assigned to the sold field becomes unassigned.
+      sellField: (fieldId) => {
+        const state = get();
+        const field = state.fields.find(f => f.id === fieldId);
+        if (!field) return false;
+        if (field.type === 'starter') {
+          state.addToast('Your starter field is permanent — try selling a purchased field instead.', 'warning');
+          return false;
+        }
+        const refund = Math.floor(FIELD_CONFIG[field.type].price * 0.55);
+        Sound.cash();
+        set(s => ({
+          fields: s.fields.filter(f => f.id !== fieldId),
+          // Free up any harvester that was assigned to this field
+          harvesters: s.harvesters.map(h =>
+            h.fieldId === fieldId ? { ...h, fieldId: null } : h
+          ),
+          money: s.money + refund,
+          toasts: [...s.toasts, {
+            id: uid(),
+            message: `Sold ${FIELD_CONFIG[field.type].name} field for ${formatMoney(refund)}`,
+            type: 'success' as const,
+          }].slice(-5),
+        }));
+        return true;
+      },
+
       buyHarvester: (type) => {
         const cfg = HARVESTER_CONFIG[type];
         const state = get();

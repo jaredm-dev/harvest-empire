@@ -1,7 +1,8 @@
 import { useGameStore } from '../store';
-import { CROP_CONFIG, WAREHOUSE_CONFIG, HARVESTER_CONFIG } from '../config';
+import { CROP_CONFIG, WAREHOUSE_CONFIG, HARVESTER_CONFIG, FIELD_CONFIG } from '../config';
 import type { CropType } from '../types';
 import { formatMoney, formatNumber } from '../utils/format';
+import DrawerCloseButton from './DrawerCloseButton';
 
 // ── Warehouse panel ───────────────────────────────────────────────────────────
 export function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -25,11 +26,11 @@ export function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () 
   return (
     <>
       {open && <div className="backdrop" onClick={onClose} />}
-      <div className={`drawer ${open ? 'open' : ''}`}>
+      <div className={`drawer ${open ? 'open' : ''}`} role="dialog" aria-hidden={!open} aria-modal={open}>
         <div className="drawer-handle" />
         <div style={{ padding: '0 16px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <span style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>🏚️ Warehouse</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 22, cursor: 'pointer' }}>×</button>
+          <DrawerCloseButton onClose={onClose} />
         </div>
 
         <div className="drawer-scroll" style={{ padding: '0 16px 100px' }}>
@@ -144,11 +145,11 @@ export function MarketDrawer({ open, onClose }: { open: boolean; onClose: () => 
   return (
     <>
       {open && <div className="backdrop" onClick={onClose} />}
-      <div className={`drawer ${open ? 'open' : ''}`}>
+      <div className={`drawer ${open ? 'open' : ''}`} role="dialog" aria-hidden={!open} aria-modal={open}>
         <div className="drawer-handle" />
         <div style={{ padding: '0 16px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <span style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>🏪 Fresh Market</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 22, cursor: 'pointer' }}>×</button>
+          <DrawerCloseButton onClose={onClose} />
         </div>
 
         <div className="drawer-scroll" style={{ padding: '0 16px 100px' }}>
@@ -360,6 +361,7 @@ export function AssignDrawer({
   const setCropOnField = useGameStore(s => s.setCropOnField);
   const tendField = useGameStore(s => s.tendField);
   const fixFieldIssue = useGameStore(s => s.fixFieldIssue);
+  const sellField = useGameStore(s => s.sellField);
   const unlockedCrops = useGameStore(s => s.unlockedCrops);
   const addToast = useGameStore(s => s.addToast);
 
@@ -376,11 +378,11 @@ export function AssignDrawer({
   return (
     <>
       {open && <div className="backdrop" onClick={onClose} />}
-      <div className={`drawer ${open ? 'open' : ''}`}>
+      <div className={`drawer ${open ? 'open' : ''}`} role="dialog" aria-hidden={!open} aria-modal={open}>
         <div className="drawer-handle" />
         <div style={{ padding: '0 16px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <span style={{ color: 'white', fontWeight: 800, fontSize: 16 }}>⚙️ Field Settings</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 22, cursor: 'pointer' }}>×</button>
+          <DrawerCloseButton onClose={onClose} />
         </div>
 
         <div className="drawer-scroll" style={{ padding: '0 16px 100px' }}>
@@ -494,6 +496,29 @@ export function AssignDrawer({
             <div style={{ color: '#475569', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
               No harvesters available. Buy one in the Shop!
             </div>
+          )}
+
+          {/* Sell field — only for non-starter fields. Shows the refund up
+              front so the player can decide. */}
+          {field.type !== 'starter' && (
+            <button
+              onClick={() => {
+                const refund = Math.floor(FIELD_CONFIG[field.type].price * 0.55);
+                const ok = window.confirm(
+                  `Sell this ${FIELD_CONFIG[field.type].name} field for ${formatMoney(refund)}?\n\nAny crops still in the field will be lost. The assigned harvester (if any) will go back into the pool.`
+                );
+                if (!ok) return;
+                if (sellField(field.id)) onClose();
+              }}
+              style={{
+                width: '100%', padding: '11px', marginTop: 18,
+                background: 'rgba(180, 83, 9, 0.15)', color: '#fbbf24',
+                border: '1.5px solid #b45309', borderRadius: 12,
+                fontWeight: 800, fontSize: 13, cursor: 'pointer',
+              }}
+            >
+              💰 Sell field for {formatMoney(Math.floor(FIELD_CONFIG[field.type].price * 0.55))}
+            </button>
           )}
 
           <button

@@ -165,6 +165,7 @@ export interface GameStore {
 
   sellTruck: (truckId: string) => boolean;
   sellHarvester: (harvesterId: string) => boolean;
+  sellField: (fieldId: string) => boolean;
 
   simulateIAP: (itemId: string) => void;
   prestige: () => void;

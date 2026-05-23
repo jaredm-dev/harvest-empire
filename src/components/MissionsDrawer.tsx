@@ -1,5 +1,6 @@
 import { useGameStore } from '../store';
 import { formatMoney, formatNumber } from '../utils/format';
+import DrawerCloseButton from './DrawerCloseButton';
 
 export default function MissionsDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const missions = useGameStore(s => s.dailyMissions) || [];
@@ -8,11 +9,11 @@ export default function MissionsDrawer({ open, onClose }: { open: boolean; onClo
   return (
     <>
       {open && <div className="backdrop" onClick={onClose} />}
-      <div className={`drawer ${open ? 'open' : ''}`}>
+      <div className={`drawer ${open ? 'open' : ''}`} role="dialog" aria-hidden={!open} aria-modal={open}>
         <div className="drawer-handle" />
         <div style={{ padding: '0 16px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <span style={{ color: 'white', fontWeight: 900, fontSize: 16 }}>📅 Daily Missions</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <DrawerCloseButton onClose={onClose} />
         </div>
 
         <p style={{ color: '#94a3b8', fontSize: 11, padding: '0 16px 10px', flexShrink: 0 }}>

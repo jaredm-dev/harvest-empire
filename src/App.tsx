@@ -59,6 +59,18 @@ export default function App() {
     refreshDailyMissions();
   }, [applyOfflineProgress, checkDailyBonus, refreshDailyMissions]);
 
+  // Escape key closes any open drawer / modal — important for screen reader
+  // and keyboard users who otherwise get stuck inside a "trapped" panel.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && modal !== 'none') {
+        setModal('none');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [modal]);
+
   // Handle return from Stripe Checkout
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

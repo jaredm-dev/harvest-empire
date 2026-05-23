@@ -5,6 +5,7 @@ import {
   CROP_CONFIG, IAP_ITEMS, UPGRADE_CONFIG,
 } from '../config';
 import type { FieldType, HarvesterType, WarehouseType, TruckType, CropType, UpgradeType } from '../types';
+import DrawerCloseButton from './DrawerCloseButton';
 import { formatMoney, formatNumber } from '../utils/format';
 
 type ShopTab = 'fields' | 'crops' | 'machines' | 'storage' | 'trucks' | 'upgrades' | 'iap';
@@ -115,11 +116,11 @@ export default function ShopDrawer({ open, onClose }: { open: boolean; onClose: 
   return (
     <>
       {open && <div className="backdrop" onClick={onClose} />}
-      <div className={`drawer ${open ? 'open' : ''}`}>
+      <div className={`drawer ${open ? 'open' : ''}`} role="dialog" aria-hidden={!open} aria-modal={open}>
         <div className="drawer-handle" />
         <div style={{ padding: '0 16px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
           <span style={{ color: 'white', fontWeight: 900, fontSize: 16 }}>Shop</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
+          <DrawerCloseButton onClose={onClose} />
         </div>
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '0 16px 10px', flexShrink: 0 }}>

@@ -404,7 +404,10 @@ function AnimalSprite({ x, y, type, flip, moving }: {
 }) {
   const animalScale = ANIMAL_SCALE[type];
   const outerT = `translate(${x},${y}) scale(${flip ? -animalScale : animalScale},${animalScale})`;
-  const animCls = moving ? 'animal-walking' : type === 'cow' ? 'animal-idle-slow' : 'animal-idle';
+  // Only the walking animation runs — idle/breathing/pecking animations
+  // were burning GPU on every idle frame for every animal. Standing still
+  // when not moving is fine visually.
+  const animCls = moving ? 'animal-walking' : '';
 
   if (type === 'chicken') {
     return (
@@ -868,28 +871,46 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
       items.push({ kind: 'parkedHarvester', htype: harvester.type, idx });
     });
 
-  // Perimeter fence — pushed outward so it doesn't crowd the buildings/fields.
-  // The fence is the canonical world boundary; nothing (animals included)
-  // can leave it.
+  // Perimeter fence — draws ONE outward-facing tile-edge per perimeter
+  // tile, picking the side that points away from the playable interior.
+  // The previous version drew two sides per tile (and duplicated them at
+  // corners), which left inward-pointing fence stubs at the diamond corners
+  // — that's the visual "cut off / broken" the user was reporting.
+  //
+  // Naming reminder: in this codebase the fence "side" name describes the
+  // direction the edge points *toward*, not where it is on the tile. So:
+  //   SE = top→right edge (faces north-east outward)
+  //   NE = bottom→right edge (faces south-east outward)
+  //   NW = left→bottom edge (faces south-west outward)
+  //   SW = left→top edge (faces north-west outward)
+  const fenceKey = new Set<string>();
+  const addFence = (col: number, row: number, side: 'NE'|'NW'|'SE'|'SW') => {
+    const key = `${col},${row},${side}`;
+    if (fenceKey.has(key)) return;
+    fenceKey.add(key);
+    if (isTileVisible(col, row)) {
+      items.push({ kind: 'fence', col, row, side });
+    }
+  };
+  // Top-right edge of the diamond (iso row = PERIM_MIN_ROW): each tile's
+  // outward-facing edge is its top→right edge.
   for (let c = PERIM_MIN_COL; c <= PERIM_MAX_COL; c++) {
-    if (isTileVisible(c, PERIM_MIN_ROW)) {
-      items.push({ kind: 'fence', col: c, row: PERIM_MIN_ROW, side: 'NW' });
-      items.push({ kind: 'fence', col: c, row: PERIM_MIN_ROW, side: 'NE' });
-    }
-    if (isTileVisible(c, PERIM_MAX_ROW)) {
-      items.push({ kind: 'fence', col: c, row: PERIM_MAX_ROW, side: 'SW' });
-      items.push({ kind: 'fence', col: c, row: PERIM_MAX_ROW, side: 'SE' });
-    }
+    addFence(c, PERIM_MIN_ROW, 'SE');
   }
+  // Bottom-right edge of the diamond (iso col = PERIM_MAX_COL): outward
+  // edge is bottom→right.
   for (let r = PERIM_MIN_ROW; r <= PERIM_MAX_ROW; r++) {
-    if (isTileVisible(PERIM_MIN_COL, r)) {
-      items.push({ kind: 'fence', col: PERIM_MIN_COL, row: r, side: 'NW' });
-      items.push({ kind: 'fence', col: PERIM_MIN_COL, row: r, side: 'SW' });
-    }
-    if (isTileVisible(PERIM_MAX_COL, r)) {
-      items.push({ kind: 'fence', col: PERIM_MAX_COL, row: r, side: 'NE' });
-      items.push({ kind: 'fence', col: PERIM_MAX_COL, row: r, side: 'SE' });
-    }
+    addFence(PERIM_MAX_COL, r, 'NE');
+  }
+  // Bottom-left edge of the diamond (iso row = PERIM_MAX_ROW): outward
+  // edge is left→bottom.
+  for (let c = PERIM_MIN_COL; c <= PERIM_MAX_COL; c++) {
+    addFence(c, PERIM_MAX_ROW, 'NW');
+  }
+  // Top-left edge of the diamond (iso col = PERIM_MIN_COL): outward edge
+  // is left→top.
+  for (let r = PERIM_MIN_ROW; r <= PERIM_MAX_ROW; r++) {
+    addFence(PERIM_MIN_COL, r, 'SW');
   }
 
   // Buildings (decorative first so they depth-sort correctly)
@@ -1350,13 +1371,61 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
             }
 
             if (item.kind === 'fence') {
+              // Build a proper post-and-rail fence segment instead of a
+              // single thin polygon. We use the first two points of the
+              // edge polygon as the segment endpoints, then draw:
+              //   - a top rail (light wood)
+              //   - a bottom rail (darker, slightly offset down)
+              //   - two short vertical posts at the segment endpoints
+              // This makes the fence read as wooden posts + cross-beams
+              // rather than just an outlined box.
               const segs = fenceEdgePts(item.col, item.row, item.side);
+              const [ax, ay] = segs[0];
+              const [bx, by] = segs[1];
+              const POST_H = 10;
+              const POST_W = 3;
+              const RAIL_W = 2.2;
               return (
-                <polygon key={`f${i}`}
-                  points={segs.map(([x,y]) => `${x},${y}`).join(' ')}
-                  fill="#8B4513"
-                  stroke="#5a2d0c" strokeWidth={0.8}
-                />
+                <g key={`f${i}`}>
+                  {/* Bottom rail (slightly offset down + darker) */}
+                  <line
+                    x1={ax} y1={ay + 2.5}
+                    x2={bx} y2={by + 2.5}
+                    stroke="#5a2d0c"
+                    strokeWidth={RAIL_W}
+                    strokeLinecap="round"
+                  />
+                  {/* Top rail */}
+                  <line
+                    x1={ax} y1={ay - 1}
+                    x2={bx} y2={by - 1}
+                    stroke="#8B4513"
+                    strokeWidth={RAIL_W}
+                    strokeLinecap="round"
+                  />
+                  {/* Post at endpoint A */}
+                  <rect
+                    x={ax - POST_W / 2}
+                    y={ay - POST_H + 2}
+                    width={POST_W}
+                    height={POST_H + 1}
+                    fill="#6b3a17"
+                    stroke="#3f1f0a"
+                    strokeWidth={0.6}
+                    rx={0.6}
+                  />
+                  {/* Post at endpoint B */}
+                  <rect
+                    x={bx - POST_W / 2}
+                    y={by - POST_H + 2}
+                    width={POST_W}
+                    height={POST_H + 1}
+                    fill="#6b3a17"
+                    stroke="#3f1f0a"
+                    strokeWidth={0.6}
+                    rx={0.6}
+                  />
+                </g>
               );
             }
 
