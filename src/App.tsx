@@ -10,9 +10,11 @@ import Tutorial from './components/Tutorial';
 import OfflineModal from './components/OfflineModal';
 import MissionsDrawer from './components/MissionsDrawer';
 import FloatingNumbers from './components/FloatingNumbers';
+import SettingsPanel from './components/SettingsPanel';
+import StatsPanel from './components/StatsPanel';
 import { Sound } from './utils/sound';
 
-type Modal = 'none' | 'shop' | 'warehouse' | 'market' | 'prestige' | 'assign' | 'missions';
+type Modal = 'none' | 'shop' | 'warehouse' | 'market' | 'prestige' | 'assign' | 'missions' | 'settings' | 'stats';
 
 export default function App() {
   const [modal, setModal] = useState<Modal>('none');
@@ -144,7 +146,11 @@ export default function App() {
         onFieldClick={id => { setSelectedField(id); setModal('assign'); }}
       />
 
-      <HUD onPrestige={() => setModal('prestige')} />
+      <HUD
+        onPrestige={() => setModal('prestige')}
+        onSettings={() => setModal('settings')}
+        onStats={() => setModal('stats')}
+      />
       <ToastStack />
       <FloatingNumbers />
 
@@ -161,6 +167,8 @@ export default function App() {
       <MarketDrawer open={modal === 'market'} onClose={close} />
       <AssignDrawer open={modal === 'assign'} fieldId={selectedField} onClose={close} />
       <MissionsDrawer open={modal === 'missions'} onClose={close} />
+      <SettingsPanel open={modal === 'settings'} onClose={close} />
+      <StatsPanel open={modal === 'stats'} onClose={close} />
 
       {modal === 'prestige' && (
         <>

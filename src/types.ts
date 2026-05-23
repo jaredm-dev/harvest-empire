@@ -144,6 +144,7 @@ export interface GameStore {
   // Lifetime stats for missions
   totalCropsHarvested: number;
   totalDeliveriesCompleted: number;
+  gameStartedAt: number | null;
 
   tick: (delta: number) => void;
   harvestField: (fieldId: string) => HarvestResult;
@@ -173,6 +174,7 @@ export interface GameStore {
   dismissToast: (id: string) => void;
   addToast: (message: string, type?: Toast['type']) => void;
   checkDailyBonus: () => void;
+  resetGame: () => void;
   applyOfflineProgress: () => void;
   clearOfflineReport: () => void;
   refreshDailyMissions: () => void;

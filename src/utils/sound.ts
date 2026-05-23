@@ -3,7 +3,11 @@
 // AudioContext on the first call.
 
 let ctx: AudioContext | null = null;
-let muted = false;
+// Mute state is persisted to localStorage so the user's preference survives
+// page reloads. Default to unmuted on first visit.
+let muted = (() => {
+  try { return localStorage.getItem('he-muted') === '1'; } catch { return false; }
+})();
 let lastPlayed: Record<string, number> = {};
 
 const getCtx = (): AudioContext | null => {
@@ -76,7 +80,10 @@ const playSeq = (
 };
 
 export const Sound = {
-  setMuted(m: boolean) { muted = m; },
+  setMuted(m: boolean) {
+    muted = m;
+    try { localStorage.setItem('he-muted', m ? '1' : '0'); } catch {}
+  },
   isMuted: () => muted,
 
   // Soft pop for taps / button presses

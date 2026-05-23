@@ -1,10 +1,18 @@
 import { useGameStore } from '../store';
 import { PRESTIGE_CONFIG } from '../config';
+import { formatMoney } from '../utils/format';
 
 export default function PrestigeView() {
   const totalEarned = useGameStore(s => s.totalEarned);
   const prestigeLevel = useGameStore(s => s.prestigeLevel);
   const prestige = useGameStore(s => s.prestige);
+  // Stats shown in the confirmation dialog so the player knows exactly
+  // what they're about to wipe out.
+  const fieldCount = useGameStore(s => s.fields.length);
+  const truckCount = useGameStore(s => s.trucks.length);
+  const harvesterCount = useGameStore(s => s.harvesters.length);
+  const warehouseCount = useGameStore(s => s.warehouses.length);
+  const money = useGameStore(s => s.money);
 
   const nextPrestige = PRESTIGE_CONFIG[prestigeLevel];
   const canPrestige = nextPrestige && totalEarned >= nextPrestige.requirement;
@@ -67,9 +75,23 @@ export default function PrestigeView() {
 
           <button
             onClick={() => {
-              if (canPrestige && confirm(`Reset your empire for ${nextPrestige.multiplier}× income?`)) {
-                prestige();
-              }
+              if (!canPrestige) return;
+              // Show the exact stuff being wiped out so this isn't a surprise.
+              const losing = [
+                `${fieldCount} field${fieldCount === 1 ? '' : 's'}`,
+                `${harvesterCount} harvester${harvesterCount === 1 ? '' : 's'}`,
+                `${warehouseCount} warehouse${warehouseCount === 1 ? '' : 's'}`,
+                `${truckCount} truck${truckCount === 1 ? '' : 's'}`,
+                `${formatMoney(money)} cash`,
+                'all upgrades',
+              ].join('\n  • ');
+              const ok = window.confirm(
+                `Prestige to ${nextPrestige.name}?\n\n` +
+                `You'll permanently get ${nextPrestige.multiplier}× income forever.\n\n` +
+                `You'll lose:\n  • ${losing}\n\n` +
+                `Your achievements, login streak, and unlocked crops stay.`,
+              );
+              if (ok) prestige();
             }}
             disabled={!canPrestige}
             className={`w-full py-3.5 rounded-2xl font-bold text-base transition-all ${

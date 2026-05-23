@@ -140,6 +140,11 @@ const INITIAL_STATE = {
   offlineReport: null as null | { seconds: number; moneyEarned: number; cropsGrown: number },
   totalCropsHarvested: 0,
   totalDeliveriesCompleted: 0,
+  // Unix ms when the player first opened the game on this save. Used by the
+  // Stats panel to show "days played". Set lazily on the first checkDailyBonus
+  // call (or any other action) if not already set, so the existing-save
+  // migration just picks up "today" for legacy players.
+  gameStartedAt: null as number | null,
 };
 
 // Helper to update mission progress
@@ -951,9 +956,33 @@ export const useGameStore = create<GameStore>()(
         }));
       },
 
+      // Hard reset — wipe everything back to the initial state. Used by the
+      // "Reset save" button in the Settings panel. Anything not in
+      // INITIAL_STATE (like the cosmetic `gameStartedAt`) is reset to null,
+      // and `hasSeenTutorial` is also cleared so the tutorial fires again.
+      resetGame: () => {
+        set({
+          ...INITIAL_STATE,
+          marketOrders: generateMarketOrders(['tomato'], 0),
+          gameStartedAt: Date.now(),
+          hasSeenTutorial: false,
+          toasts: [{
+            id: uid(),
+            message: 'Game reset — fresh start!',
+            type: 'info' as const,
+          }],
+        });
+      },
+
       checkDailyBonus: () => {
         const state = get();
         const today = new Date().toISOString().split('T')[0];
+        // Set the "game started" timestamp once, the first time we ever
+        // process a daily-bonus check on this save. Legacy players just
+        // get "today" — close enough for the stats display.
+        if (!state.gameStartedAt) {
+          set({ gameStartedAt: Date.now() });
+        }
         if (state.lastLoginDate === today) return;
         const yesterday = new Date(Date.now() - 86_400_000).toISOString().split('T')[0];
         const streak = state.lastLoginDate === yesterday ? (state.loginStreak || 0) + 1 : 1;
@@ -1134,6 +1163,7 @@ export const useGameStore = create<GameStore>()(
         hasSeenTutorial: s.hasSeenTutorial,
         totalCropsHarvested: s.totalCropsHarvested,
         totalDeliveriesCompleted: s.totalDeliveriesCompleted,
+        gameStartedAt: s.gameStartedAt,
       }),
     },
   ),

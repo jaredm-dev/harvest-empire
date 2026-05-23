@@ -8,9 +8,11 @@ const KOFI_URL = 'https://ko-fi.com/harvestempire';
 
 interface Props {
   onPrestige: () => void;
+  onSettings: () => void;
+  onStats: () => void;
 }
 
-export default function HUD({ onPrestige }: Props) {
+export default function HUD({ onPrestige, onSettings, onStats }: Props) {
   const money = useGameStore(s => s.money);
   const gems = useGameStore(s => s.gems ?? 0);
   const totalEarned = useGameStore(s => s.totalEarned);
@@ -57,6 +59,40 @@ export default function HUD({ onPrestige }: Props) {
               <div className="hud-multiplier">{multiplier}x income</div>
             )}
             <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+              {/* Stats icon — opens the lifetime-stats panel. */}
+              <button
+                type="button"
+                onClick={onStats}
+                aria-label="Statistics"
+                title="Statistics"
+                style={{
+                  width: 30, height: 30, borderRadius: 999,
+                  background: 'rgba(14, 116, 144, 0.22)',
+                  border: '1px solid rgba(14, 116, 144, 0.45)',
+                  color: '#67e8f9', fontSize: 14, cursor: 'pointer',
+                  display: 'grid', placeItems: 'center', flexShrink: 0,
+                  padding: 0, lineHeight: 1,
+                }}
+              >
+                📊
+              </button>
+              {/* Settings icon — opens the settings panel (mute/etc). */}
+              <button
+                type="button"
+                onClick={onSettings}
+                aria-label="Settings"
+                title="Settings"
+                style={{
+                  width: 30, height: 30, borderRadius: 999,
+                  background: 'rgba(148, 163, 184, 0.18)',
+                  border: '1px solid rgba(148, 163, 184, 0.35)',
+                  color: '#cbd5e1', fontSize: 14, cursor: 'pointer',
+                  display: 'grid', placeItems: 'center', flexShrink: 0,
+                  padding: 0, lineHeight: 1,
+                }}
+              >
+                ⚙️
+              </button>
               <a
                 href={KOFI_URL}
                 target="_blank"
