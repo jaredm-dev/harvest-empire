@@ -1123,7 +1123,12 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
         <svg
           width={SVG_W}
           height={SVG_H}
-          style={{ position: 'absolute', top: 0, left: 0 }}
+          // overflow:visible lets content at negative x render outside the
+          // SVG bounds. The leftmost perimeter tile sits at world x ≈ -308
+          // (because OX=700 and the perim extends to col -4 / row 24), and
+          // without this override the SVG would clip it — that's why the
+          // left side of the fence appeared cut off.
+          style={{ position: 'absolute', top: 0, left: 0, overflow: 'visible' }}
           onClick={e => {
             if (dragDist.current > 6) return; // was a drag, not a tap
             // Check warehouse / market tap (handled by foreignObject below)
