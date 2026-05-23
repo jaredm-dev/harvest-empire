@@ -66,6 +66,7 @@ export const UPGRADE_CONFIG: Record<UpgradeType, {
   autoTend:         { name: 'Farmhand Crew',       emoji: '👨‍🌾', price: 55000,  prestigeRequired: 1, description: 'Automatically fixes dry/pest/weed issues — no downtime on fields' },
   extraYield:       { name: 'Premium Seeds',       emoji: '🌾', price: 7500,   prestigeRequired: 0, description: '+15% crops per harvest cycle — every field grows more' },
   marketStand:      { name: 'Premium Market Stall',emoji: '🏪', price: 22000,  prestigeRequired: 0, description: 'Trucks deliver at 10% higher value multiplier on every run' },
+  harvestManager:   { name: 'Harvest Manager',     emoji: '📋', price: 35000,  prestigeRequired: 0, description: 'Auto-collects ready crops on EVERY field — no per-field harvester needed' },
 };
 
 export const PRESTIGE_CONFIG = [

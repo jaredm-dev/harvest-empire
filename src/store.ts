@@ -239,6 +239,15 @@ export const useGameStore = create<GameStore>()(
                 harvestBuffer += amount;
               }
             }
+          } else if (upgrades.harvestManager && issue !== 'brokenHarvester') {
+            // Harvest Manager upgrade: fields without a dedicated harvester
+            // still auto-collect at the rate of a basic harvester (1 unit/sec)
+            // so the player never needs to manually tap a ready field.
+            const amount = Math.min(1.0 * delta, readyToPick);
+            if (amount > 0) {
+              readyToPick   -= amount;
+              harvestBuffer += amount;
+            }
           }
 
           return { ...field, growthProgress, readyToPick, readyAge, condition, issue, harvestBuffer };

@@ -5,7 +5,8 @@ export type WarehouseType = 'stand' | 'small' | 'distribution' | 'mega';
 export type TruckType = 'pickup' | 'van' | 'box' | 'semi';
 export type UpgradeType =
   | 'irrigation' | 'compost' | 'scarecrow' | 'coldStorage' | 'mechanic'
-  | 'fasterTrucks' | 'premiumContracts' | 'autoTend' | 'extraYield' | 'marketStand';
+  | 'fasterTrucks' | 'premiumContracts' | 'autoTend' | 'extraYield' | 'marketStand'
+  | 'harvestManager';
 export type FieldIssue = 'dry' | 'pests' | 'weeds' | 'brokenHarvester';
 export type EventType = 'market_surge' | 'bumper_crop' | 'delivery_bonus' | 'drought';
 
