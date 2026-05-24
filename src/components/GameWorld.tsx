@@ -661,15 +661,15 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     const contentH = 1000;
     const z = Math.max(0.5, Math.min(vw / contentW, usableH / contentH, 1.2));
 
-    // The 3 building cluster's visual centroid in world coords. Centering
-    // on this (instead of FIELD_ANCHOR or the geometric perim center) puts
-    // the homestead, warehouse and market all comfortably on screen.
-    //   HOMESTEAD center ≈ (592, 248)
-    //   WAREHOUSE center ≈ (1492, 662)
-    //   MARKET center    ≈ (1186, 797)
-    //   mean ≈ (1090, 569)
-    const worldCenterX = 1090;
-    const worldCenterY = 569;
+    // Center on the geometric center of the fence diamond — that's what
+    // visually frames "the farm" for the player, so centering it makes
+    // the empty-grass margins balanced on left and right. Centering on
+    // the building cluster (which sits right-of-center inside the fence)
+    // pushed everything left-heavy.
+    //   Perim corners: top (628,32), right (1924,680), bottom (988,1148), left (-308,500)
+    //   Geometric mean ≈ (808, 590)
+    const worldCenterX = 808;
+    const worldCenterY = 590;
     const targetCenterX = vw / 2;
     const targetCenterY = hudReserve + skyReserve + usableH / 2;
     return {
