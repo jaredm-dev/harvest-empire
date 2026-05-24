@@ -657,9 +657,9 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     const usableH = Math.max(300, vh - hudReserve - skyReserve - 80);
     // The buildings + fields + roads actually occupy a smaller footprint
     // than the full fence diamond — focus the zoom on the playable area.
-    const contentW = 1300;
-    const contentH = 820;
-    const z = Math.max(0.5, Math.min(vw / contentW, usableH / contentH, 1.5));
+    const contentW = 1600;
+    const contentH = 1000;
+    const z = Math.max(0.5, Math.min(vw / contentW, usableH / contentH, 1.2));
 
     // The 3 building cluster's visual centroid in world coords. Centering
     // on this (instead of FIELD_ANCHOR or the geometric perim center) puts
