@@ -19,7 +19,13 @@ const ORDER_TITLES = ['Fresh crate', 'Kitchen restock', 'Festival bundle', 'Chef
 const RARITY_POOL: Array<MarketOrder['rarity']> = ['standard', 'standard', 'premium', 'rush'];
 const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-const generateOneOrder = (unlockedCrops: CropType[], prestigeLevel: number): MarketOrder => {
+const generateOneOrder = (
+  unlockedCrops: CropType[],
+  prestigeLevel: number,
+  // Customers already in use by other active orders — avoid picking these
+  // so the order board doesn't show "Sunrise Cafe" three times in a row.
+  excludeCustomers: string[] = [],
+): MarketOrder => {
   const crops = unlockedCrops.length > 0 ? unlockedCrops : ['tomato' as CropType];
   const rarity = pickRandom(RARITY_POOL);
   const cropA = pickRandom(crops);
@@ -40,10 +46,14 @@ const generateOneOrder = (unlockedCrops: CropType[], prestigeLevel: number): Mar
   // Rush is now the highest-value, premium is second, standard is base.
   const valueMult = rarity === 'rush' ? 2.8 : rarity === 'premium' ? 2.2 : 1.85;
 
+  // Pick a customer not already used elsewhere on the active board.
+  const availableCustomers = ORDER_NAMES.filter(n => !excludeCustomers.includes(n));
+  const customer = pickRandom(availableCustomers.length > 0 ? availableCustomers : ORDER_NAMES);
+
   return {
     id: uid(),
     title: pickRandom(ORDER_TITLES),
-    customer: pickRandom(ORDER_NAMES),
+    customer,
     requirements,
     rewardMoney: Math.floor(cropValue * valueMult * getPrestigeMultiplier(prestigeLevel)),
     // Rush > premium for gems (player feedback)
@@ -54,7 +64,15 @@ const generateOneOrder = (unlockedCrops: CropType[], prestigeLevel: number): Mar
 };
 
 const generateMarketOrders = (unlockedCrops: CropType[], prestigeLevel: number): MarketOrder[] => {
-  return Array.from({ length: 4 }, () => generateOneOrder(unlockedCrops, prestigeLevel));
+  // Build the four orders sequentially, tracking which customers have
+  // already been assigned so the board has variety instead of "Sunrise
+  // Cafe x3".
+  const used: string[] = [];
+  return Array.from({ length: 4 }, () => {
+    const order = generateOneOrder(unlockedCrops, prestigeLevel, used);
+    used.push(order.customer);
+    return order;
+  });
 };
 
 const normalizeField = (field: Field): Field => ({
@@ -425,9 +443,20 @@ export const useGameStore = create<GameStore>()(
             activeEvents: updatedEvents,
             dailyMissions: missions,
             lastSavedTime: Date.now(),
-            marketOrders: (s.marketOrders?.length ? s.marketOrders : generateMarketOrders(s.unlockedCrops, s.prestigeLevel))
-              .map(order => ({ ...order, expiresIn: Math.max(0, order.expiresIn - delta) }))
-              .map(order => order.expiresIn <= 0 ? generateOneOrder(s.unlockedCrops, s.prestigeLevel) : order),
+            marketOrders: (() => {
+              const base = s.marketOrders?.length
+                ? s.marketOrders
+                : generateMarketOrders(s.unlockedCrops, s.prestigeLevel);
+              return base
+                .map(order => ({ ...order, expiresIn: Math.max(0, order.expiresIn - delta) }))
+                .map((order, _i, allOrders) => {
+                  if (order.expiresIn > 0) return order;
+                  // Replace expired order with a fresh one that doesn't
+                  // share a customer with the other active orders.
+                  const inUse = allOrders.filter(o => o.id !== order.id).map(o => o.customer);
+                  return generateOneOrder(s.unlockedCrops, s.prestigeLevel, inUse);
+                });
+            })(),
             toasts: [...s.toasts, ...newToasts].slice(-5),
           };
         });
@@ -651,7 +680,12 @@ export const useGameStore = create<GameStore>()(
           totalEarned: s.totalEarned + order.rewardMoney,
           marketOrdersCompleted: (s.marketOrdersCompleted || 0) + 1,
           dailyMissions: bumpMissions(bumpMissions(s.dailyMissions || [], 'complete_orders', 1), 'earn_money', order.rewardMoney),
-          marketOrders: orders.map(o => o.id === orderId ? generateOneOrder(s.unlockedCrops, s.prestigeLevel) : o),
+          marketOrders: orders.map(o => {
+            if (o.id !== orderId) return o;
+            // Don't reuse a customer already on the board
+            const inUse = orders.filter(x => x.id !== orderId).map(x => x.customer);
+            return generateOneOrder(s.unlockedCrops, s.prestigeLevel, inUse);
+          }),
           toasts: order.rewardGems
             ? [...s.toasts, { id: uid(), message: `+${order.rewardGems} gems`, type: 'success' as const }].slice(-5)
             : s.toasts,

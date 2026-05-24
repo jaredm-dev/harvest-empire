@@ -24,8 +24,12 @@ export default function HUD({ onPrestige, onSettings, onStats }: Props) {
   const prev = useRef(money);
 
   useEffect(() => {
-    if (money !== prev.current) {
-      prev.current = money;
+    const diff = money - prev.current;
+    prev.current = money;
+    // Only flash the money counter green on BIG gains (an order, a sale,
+    // a delivery completion). Small per-tick income trickle was making the
+    // counter twitch constantly which was distracting AND less readable.
+    if (diff >= 25) {
       setPop(true);
       const timer = setTimeout(() => setPop(false), 360);
       return () => clearTimeout(timer);

@@ -659,16 +659,20 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     // than the full fence diamond — focus the zoom on the playable area.
     const contentW = 1600;
     const contentH = 1000;
-    const z = Math.max(0.5, Math.min(vw / contentW, usableH / contentH, 1.2));
+    // Floor lowered to 0.35 so on a 533-wide phone the warehouse stops
+    // getting clipped on the right. The world becomes tiny but at least
+    // everything is visible.
+    const z = Math.max(0.35, Math.min(vw / contentW, usableH / contentH, 1.2));
 
-    // Center on the geometric center of the fence diamond — that's what
-    // visually frames "the farm" for the player, so centering it makes
-    // the empty-grass margins balanced on left and right. Centering on
-    // the building cluster (which sits right-of-center inside the fence)
-    // pushed everything left-heavy.
-    //   Perim corners: top (628,32), right (1924,680), bottom (988,1148), left (-308,500)
-    //   Geometric mean ≈ (808, 590)
-    const worldCenterX = 808;
+    // Center target: prefer the fence-diamond center for the balanced
+    // empty-grass margins, BUT on narrow screens where the fence won't
+    // fit, drift the center back toward the building cluster so the
+    // warehouse doesn't fall off the right edge.
+    //   Fence diamond center ≈ (808, 590)
+    //   Building cluster center ≈ (1090, 569)
+    const fenceWidth = 2232; // distance from leftmost perim x to rightmost
+    const fits = fenceWidth * z < vw - 40;
+    const worldCenterX = fits ? 808 : 1000; // closer to buildings when cramped
     const worldCenterY = 590;
     const targetCenterX = vw / 2;
     const targetCenterY = hudReserve + skyReserve + usableH / 2;
@@ -2039,48 +2043,90 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
           const assignedHarv = useGameStore.getState().harvesters.find(h => h.fieldId === field.id);
 
           return (
-            <button
+            <div
               key={field.id}
-              data-world-control="true"
-              onPointerDown={event => event.stopPropagation()}
-              onClick={event => {
-                event.stopPropagation();
-                if (ready) {
-                  doHarvest(field, S.x + pan.x, S.y + pan.y);
-                } else {
-                  onFieldClick(field.id);
-                }
-              }}
               style={{
                 position: 'absolute',
                 left: S.x - 68,
                 top: S.y - 2,
-                minWidth: 136,
-                maxWidth: 168,
-                background: issue
-                  ? 'linear-gradient(180deg, rgba(127,29,29,0.94), rgba(88,19,19,0.94))'
-                  : ready
-                    ? 'linear-gradient(180deg, rgba(245,158,11,0.96), rgba(180,83,9,0.96))'
-                    : 'linear-gradient(180deg, rgba(31,75,45,0.94), rgba(22,55,36,0.94))',
-                color: issue ? '#fee2e2' : ready ? '#fff7d6' : '#d9f99d',
-                fontSize: 9, fontWeight: 850,
-                padding: '4px 9px', borderRadius: 10,
-                border: issue ? '1px solid rgba(254,202,202,0.72)' : ready ? '1px solid rgba(254,240,138,0.68)' : '1px solid rgba(187,247,208,0.32)',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                pointerEvents: 'auto',
-                userSelect: 'none',
-                cursor: 'pointer',
-                fontFamily: 'inherit',
-                boxShadow: '0 7px 14px rgba(21, 38, 20, 0.23), inset 0 1px 0 rgba(255,255,255,0.2)',
-                textShadow: '0 1px 1px rgba(0,0,0,0.24)',
+                display: 'flex',
+                alignItems: 'stretch',
+                gap: 3,
+                pointerEvents: 'none', // children re-enable
               }}
             >
-              {cropShort} {fieldShort}
-              {issue ? ' - Fix' : ready ? ' - Ready' : condition < 80 ? ' - Tend' : ''}
-              {assignedHarv && ' +Auto'}
-            </button>
+              {/* Main label — harvests when ready, opens settings when not */}
+              <button
+                data-world-control="true"
+                onPointerDown={event => event.stopPropagation()}
+                onClick={event => {
+                  event.stopPropagation();
+                  if (ready) {
+                    doHarvest(field, S.x + pan.x, S.y + pan.y);
+                  } else {
+                    onFieldClick(field.id);
+                  }
+                }}
+                aria-label={ready ? `Harvest ${cropShort}` : `${cropShort} ${fieldShort}`}
+                style={{
+                  flex: 1,
+                  minWidth: 110,
+                  maxWidth: 140,
+                  background: issue
+                    ? 'linear-gradient(180deg, rgba(127,29,29,0.94), rgba(88,19,19,0.94))'
+                    : ready
+                      ? 'linear-gradient(180deg, rgba(245,158,11,0.96), rgba(180,83,9,0.96))'
+                      : 'linear-gradient(180deg, rgba(31,75,45,0.94), rgba(22,55,36,0.94))',
+                  color: issue ? '#fee2e2' : ready ? '#fff7d6' : '#d9f99d',
+                  fontSize: 9, fontWeight: 850,
+                  padding: '4px 9px', borderRadius: 10,
+                  border: issue ? '1px solid rgba(254,202,202,0.72)' : ready ? '1px solid rgba(254,240,138,0.68)' : '1px solid rgba(187,247,208,0.32)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  pointerEvents: 'auto',
+                  userSelect: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  boxShadow: '0 7px 14px rgba(21, 38, 20, 0.23), inset 0 1px 0 rgba(255,255,255,0.2)',
+                  textShadow: '0 1px 1px rgba(0,0,0,0.24)',
+                }}
+              >
+                {cropShort} {fieldShort}
+                {issue ? ' - Fix' : ready ? ' - Ready' : condition < 80 ? ' - Tend' : ''}
+                {assignedHarv && ' +Auto'}
+              </button>
+              {/* Settings ⚙️ — always opens the field assign drawer, even
+                  when crops are ready. Discoverability fix: players were not
+                  realizing they could change crops / sell field / assign
+                  harvesters, because the main label always grabbed the click. */}
+              <button
+                data-world-control="true"
+                onPointerDown={event => event.stopPropagation()}
+                onClick={event => {
+                  event.stopPropagation();
+                  onFieldClick(field.id);
+                }}
+                aria-label={`Field settings — ${cropShort} ${fieldShort}`}
+                title="Field settings"
+                style={{
+                  width: 24,
+                  background: 'rgba(15,23,42,0.85)',
+                  color: '#cbd5e1',
+                  fontSize: 11,
+                  lineHeight: 1,
+                  padding: 0,
+                  borderRadius: 10,
+                  border: '1px solid rgba(148,163,184,0.32)',
+                  pointerEvents: 'auto',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  boxShadow: '0 6px 12px rgba(15,23,42,0.32)',
+                }}
+              >
+                ⚙
+              </button>
+            </div>
           );
         })}
       </div>
