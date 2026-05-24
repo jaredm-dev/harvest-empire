@@ -656,20 +656,27 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
     const hudReserve = 110;
     const usableH = Math.max(300, vh - hudReserve - skyReserve - 80);
     // The buildings + fields + roads actually occupy a smaller footprint
-    // than the full fence diamond — focus the zoom on the playable area,
-    // not on the empty grass perimeter. Smaller contentW = bigger zoom.
-    const contentW = 1250;
-    const contentH = 780;
-    // Cap raised so the world fills a 1280-wide itch.io embed properly
-    // (previously capped at 1.1 which left a huge grass border).
+    // than the full fence diamond — focus the zoom on the playable area.
+    const contentW = 1300;
+    const contentH = 820;
     const z = Math.max(0.5, Math.min(vw / contentW, usableH / contentH, 1.5));
+
+    // The 3 building cluster's visual centroid in world coords. Centering
+    // on this (instead of FIELD_ANCHOR or the geometric perim center) puts
+    // the homestead, warehouse and market all comfortably on screen.
+    //   HOMESTEAD center ≈ (592, 248)
+    //   WAREHOUSE center ≈ (1492, 662)
+    //   MARKET center    ≈ (1186, 797)
+    //   mean ≈ (1090, 569)
+    const worldCenterX = 1090;
+    const worldCenterY = 569;
+    const targetCenterX = vw / 2;
+    const targetCenterY = hudReserve + skyReserve + usableH / 2;
     return {
       zoom: z,
       pan: {
-        x: Math.round((vw - contentW * z) / 2 - (-150 * z)),
-        // Push the world down so it starts BELOW the sky band — homestead
-        // no longer kisses the top of the screen.
-        y: Math.round(hudReserve + skyReserve + (usableH - contentH * z) / 2 - 70 * z),
+        x: Math.round(targetCenterX - worldCenterX * z),
+        y: Math.round(targetCenterY - worldCenterY * z),
       },
     };
   };
@@ -2084,23 +2091,27 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
           onPointerDown={event => event.stopPropagation()}
           onClick={storageSpace > 0 ? collectReadyFields : onWarehouseClick}
           style={{
+            // Compact pill centered above the bottom toolbar instead of a
+            // full-width banner that ate half the playable area.
             position: 'absolute',
-            left: 12,
-            right: 78,
-            bottom: 82,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            bottom: 92,
             zIndex: 31,
-            minHeight: 44,
+            minHeight: 40,
+            padding: '0 22px',
             border: '1px solid rgba(255,255,255,0.26)',
-            borderRadius: 14,
+            borderRadius: 999,
             background: storageSpace > 0
               ? 'linear-gradient(180deg, #fbbf24 0%, #f59e0b 48%, #d97706 100%)'
               : 'linear-gradient(180deg, #f87171 0%, #ef4444 48%, #b91c1c 100%)',
             color: 'white',
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 900,
             boxShadow: '0 14px 26px rgba(120,53,15,0.28), inset 0 1px 0 rgba(255,255,255,0.3)',
             textShadow: '0 2px 1px rgba(120,53,15,0.38)',
             cursor: 'pointer',
+            whiteSpace: 'nowrap',
           }}
         >
           {storageSpace > 0
