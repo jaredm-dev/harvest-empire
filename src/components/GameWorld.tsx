@@ -648,17 +648,21 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
   // the viewport size so the whole farm is visible at once. This kills the
   // constant-input loop that was burning CPU/GPU before.
   const computeView = () => {
-    if (typeof window === 'undefined') return { zoom: 0.7, pan: { x: 0, y: 0 } };
+    if (typeof window === 'undefined') return { zoom: 0.9, pan: { x: 0, y: 0 } };
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     // Reserve room for HUD (~110px), sky band (~110px), and bottom bar (~80px)
     const skyReserve = 110;
     const hudReserve = 110;
     const usableH = Math.max(300, vh - hudReserve - skyReserve - 80);
-    // Approximate world content footprint
-    const contentW = 1700;
-    const contentH = 1000;
-    const z = Math.max(0.4, Math.min(vw / contentW, usableH / contentH, 1.1));
+    // The buildings + fields + roads actually occupy a smaller footprint
+    // than the full fence diamond — focus the zoom on the playable area,
+    // not on the empty grass perimeter. Smaller contentW = bigger zoom.
+    const contentW = 1250;
+    const contentH = 780;
+    // Cap raised so the world fills a 1280-wide itch.io embed properly
+    // (previously capped at 1.1 which left a huge grass border).
+    const z = Math.max(0.5, Math.min(vw / contentW, usableH / contentH, 1.5));
     return {
       zoom: z,
       pan: {
@@ -1675,11 +1679,11 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
                     </g>
                   )}
 
-                  {/* Label */}
+                  {/* Label — bumped from 8 to 12 so it's actually readable */}
                   <text
                     x={cx} y={N.y - H - 6}
-                    fontSize={8} fontWeight="bold" fill="white" textAnchor="middle"
-                    stroke="rgba(0,0,0,0.6)" strokeWidth={2} paintOrder="stroke"
+                    fontSize={12} fontWeight="bold" fill="white" textAnchor="middle"
+                    stroke="rgba(0,0,0,0.7)" strokeWidth={2.5} paintOrder="stroke"
                     style={{ letterSpacing: '0.06em' }}
                   >
                     {B.label}
@@ -1838,25 +1842,25 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
                     )
                   ))}
 
-                  {/* Label */}
+                  {/* Label — bumped from 9 to 12 for readability */}
                   <text
                     x={(W.x + E.x) / 2}
                     y={S.y - H * 0.55}
-                    fontSize={9}
+                    fontSize={12}
                     fontWeight="bold"
                     fill="white"
                     textAnchor="middle"
-                    stroke="rgba(0,0,0,0.5)" strokeWidth={2} paintOrder="stroke"
+                    stroke="rgba(0,0,0,0.65)" strokeWidth={2.5} paintOrder="stroke"
                     style={{ letterSpacing: '0.08em' }}
                   >
                     {B.label}
                   </text>
 
-                  {/* Inventory / earnings readout */}
+                  {/* Inventory / earnings readout — bumped from 8 to 11 */}
                   <text
                     x={(W.x + E.x) / 2}
                     y={S.y - H * 0.35}
-                    fontSize={8}
+                    fontSize={11}
                     fill="#fef3c7"
                     textAnchor="middle"
                     stroke="rgba(0,0,0,0.5)" strokeWidth={1.5} paintOrder="stroke"
