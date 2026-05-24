@@ -6,51 +6,51 @@ export const CROP_CONFIG: Record<CropType, {
   name: string; emoji: string; growTime: number;
   baseValue: number; unlockCost: number; prestigeRequired: number;
 }> = {
-  tomato:     { name: 'Tomatoes',     emoji: 'Tomato', growTime: 22,  baseValue: 5,   unlockCost: 0,      prestigeRequired: 0 },
-  lettuce:    { name: 'Lettuce',      emoji: 'Leaf',   growTime: 16,  baseValue: 4,   unlockCost: 250,    prestigeRequired: 0 },
-  strawberry: { name: 'Strawberries', emoji: 'Berry',  growTime: 45,  baseValue: 14,  unlockCost: 1200,   prestigeRequired: 0 },
-  corn:       { name: 'Corn',         emoji: 'Corn',   growTime: 65,  baseValue: 22,  unlockCost: 5000,   prestigeRequired: 0 },
-  blueberry:  { name: 'Blueberries',  emoji: 'Blue',   growTime: 90,  baseValue: 38,  unlockCost: 0,      prestigeRequired: 1 },
-  truffle:    { name: 'Truffles',     emoji: 'Rare',   growTime: 180, baseValue: 95,  unlockCost: 0,      prestigeRequired: 2 },
+  tomato:     { name: 'Tomatoes',     emoji: '🍅', growTime: 22,  baseValue: 5,   unlockCost: 0,      prestigeRequired: 0 },
+  lettuce:    { name: 'Lettuce',      emoji: '🥬', growTime: 16,  baseValue: 4,   unlockCost: 250,    prestigeRequired: 0 },
+  strawberry: { name: 'Strawberries', emoji: '🍓', growTime: 45,  baseValue: 14,  unlockCost: 1200,   prestigeRequired: 0 },
+  corn:       { name: 'Corn',         emoji: '🌽', growTime: 65,  baseValue: 22,  unlockCost: 5000,   prestigeRequired: 0 },
+  blueberry:  { name: 'Blueberries',  emoji: '🫐', growTime: 90,  baseValue: 38,  unlockCost: 0,      prestigeRequired: 1 },
+  truffle:    { name: 'Truffles',     emoji: '🍄', growTime: 180, baseValue: 95,  unlockCost: 0,      prestigeRequired: 2 },
 };
 
 export const FIELD_CONFIG: Record<FieldType, {
   name: string; emoji: string; capacity: number;
   yieldMultiplier: number; price: number; prestigeRequired: number;
 }> = {
-  starter:    { name: 'Starter Plot',     emoji: 'Plot',  capacity: 22,   yieldMultiplier: 6,   price: 0,      prestigeRequired: 0 },
-  small:      { name: 'Small Field',      emoji: 'Field', capacity: 80,   yieldMultiplier: 16,  price: 600,    prestigeRequired: 0 },
-  medium:     { name: 'Medium Field',     emoji: 'Farm',  capacity: 180,  yieldMultiplier: 35,  price: 3800,   prestigeRequired: 0 },
-  large:      { name: 'Large Field',      emoji: 'Acres', capacity: 450,  yieldMultiplier: 90,  price: 18000,  prestigeRequired: 0 },
-  industrial: { name: 'Industrial Farm',  emoji: 'Plant', capacity: 1500, yieldMultiplier: 280, price: 65000,  prestigeRequired: 1 },
+  starter:    { name: 'Starter Plot',     emoji: '🌱', capacity: 22,   yieldMultiplier: 6,   price: 0,      prestigeRequired: 0 },
+  small:      { name: 'Small Field',      emoji: '🌾', capacity: 80,   yieldMultiplier: 16,  price: 600,    prestigeRequired: 0 },
+  medium:     { name: 'Medium Field',     emoji: '🚜', capacity: 180,  yieldMultiplier: 35,  price: 3800,   prestigeRequired: 0 },
+  large:      { name: 'Large Field',      emoji: '🏞️', capacity: 450,  yieldMultiplier: 90,  price: 18000,  prestigeRequired: 0 },
+  industrial: { name: 'Industrial Farm',  emoji: '🏭', capacity: 1500, yieldMultiplier: 280, price: 65000,  prestigeRequired: 1 },
 };
 
 export const HARVESTER_CONFIG: Record<HarvesterType, {
   name: string; emoji: string; harvestRate: number; price: number; prestigeRequired: number;
 }> = {
-  basic:      { name: 'Basic Harvester',      emoji: 'Tractor', harvestRate: 0.4,  price: 700,    prestigeRequired: 0 },
-  advanced:   { name: 'Advanced Harvester',   emoji: 'Gear',    harvestRate: 1.8,  price: 6000,   prestigeRequired: 0 },
-  industrial: { name: 'Industrial Harvester', emoji: 'Rig',     harvestRate: 7,    price: 28000,  prestigeRequired: 0 },
-  mega:       { name: 'Mega Harvester',       emoji: 'Bot',     harvestRate: 28,   price: 110000, prestigeRequired: 1 },
+  basic:      { name: 'Basic Harvester',      emoji: '🚜', harvestRate: 0.4,  price: 700,    prestigeRequired: 0 },
+  advanced:   { name: 'Advanced Harvester',   emoji: '🔧', harvestRate: 1.8,  price: 6000,   prestigeRequired: 0 },
+  industrial: { name: 'Industrial Harvester', emoji: '⚙️', harvestRate: 7,    price: 28000,  prestigeRequired: 0 },
+  mega:       { name: 'Mega Harvester',       emoji: '🤖', harvestRate: 28,   price: 110000, prestigeRequired: 1 },
 };
 
 export const WAREHOUSE_CONFIG: Record<WarehouseType, {
   name: string; emoji: string; capacity: number; price: number; prestigeRequired: number;
 }> = {
-  stand:        { name: 'Roadside Stand',       emoji: 'Crate', capacity: 40,    price: 0,      prestigeRequired: 0 },
-  small:        { name: 'Small Warehouse',      emoji: 'Store', capacity: 200,   price: 2000,   prestigeRequired: 0 },
-  distribution: { name: 'Distribution Center',  emoji: 'Depot', capacity: 900,   price: 14000,  prestigeRequired: 0 },
-  mega:         { name: 'Mega Warehouse',       emoji: 'Hub',   capacity: 5000,  price: 75000,  prestigeRequired: 1 },
+  stand:        { name: 'Roadside Stand',       emoji: '🏪', capacity: 40,    price: 0,      prestigeRequired: 0 },
+  small:        { name: 'Small Warehouse',      emoji: '📦', capacity: 200,   price: 2000,   prestigeRequired: 0 },
+  distribution: { name: 'Distribution Center',  emoji: '🏬', capacity: 900,   price: 14000,  prestigeRequired: 0 },
+  mega:         { name: 'Mega Warehouse',       emoji: '🏢', capacity: 5000,  price: 75000,  prestigeRequired: 1 },
 };
 
 export const TRUCK_CONFIG: Record<TruckType, {
   name: string; emoji: string; capacity: number;
   deliveryTime: number; valueMultiplier: number; price: number; prestigeRequired: number;
 }> = {
-  pickup: { name: 'Pickup Truck', emoji: 'Pickup', capacity: 25,  deliveryTime: 80, valueMultiplier: 1.4, price: 950,    prestigeRequired: 0 },
-  van:    { name: 'Delivery Van', emoji: 'Van',    capacity: 70,  deliveryTime: 60, valueMultiplier: 1.55, price: 5500,  prestigeRequired: 0 },
-  box:    { name: 'Box Truck',    emoji: 'Box',    capacity: 180, deliveryTime: 45, valueMultiplier: 1.7, price: 18000,  prestigeRequired: 0 },
-  semi:   { name: 'Semi-Truck',   emoji: 'Semi',   capacity: 500, deliveryTime: 30, valueMultiplier: 1.85, price: 70000, prestigeRequired: 1 },
+  pickup: { name: 'Pickup Truck', emoji: '🛻', capacity: 25,  deliveryTime: 80, valueMultiplier: 1.4, price: 950,    prestigeRequired: 0 },
+  van:    { name: 'Delivery Van', emoji: '🚐', capacity: 70,  deliveryTime: 60, valueMultiplier: 1.55, price: 5500,  prestigeRequired: 0 },
+  box:    { name: 'Box Truck',    emoji: '🚚', capacity: 180, deliveryTime: 45, valueMultiplier: 1.7, price: 18000,  prestigeRequired: 0 },
+  semi:   { name: 'Semi-Truck',   emoji: '🚛', capacity: 500, deliveryTime: 30, valueMultiplier: 1.85, price: 70000, prestigeRequired: 1 },
 };
 
 export const UPGRADE_CONFIG: Record<UpgradeType, {
