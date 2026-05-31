@@ -1,4 +1,4 @@
-import type { CropType, FieldType, HarvesterType, WarehouseType, TruckType, UpgradeType, EventType } from './types';
+import type { CropType, FieldType, HarvesterType, WarehouseType, TruckType, UpgradeType, EventType, GemPerkType, GemConsumableType } from './types';
 
 export const MAX_FIELDS = 9;
 
@@ -37,10 +37,13 @@ export const HARVESTER_CONFIG: Record<HarvesterType, {
 export const WAREHOUSE_CONFIG: Record<WarehouseType, {
   name: string; emoji: string; capacity: number; price: number; prestigeRequired: number;
 }> = {
+  // Per-unit cost now DROPS as you scale up (bulk discount) instead of rising:
+  // small $10/u → distribution ~$7.8/u → mega $6/u. Players noticed the old
+  // pricing punished buying bigger storage.
   stand:        { name: 'Roadside Stand',       emoji: '🏪', capacity: 40,    price: 0,      prestigeRequired: 0 },
   small:        { name: 'Small Warehouse',      emoji: '📦', capacity: 200,   price: 2000,   prestigeRequired: 0 },
-  distribution: { name: 'Distribution Center',  emoji: '🏬', capacity: 900,   price: 14000,  prestigeRequired: 0 },
-  mega:         { name: 'Mega Warehouse',       emoji: '🏢', capacity: 5000,  price: 75000,  prestigeRequired: 1 },
+  distribution: { name: 'Distribution Center',  emoji: '🏬', capacity: 900,   price: 7000,   prestigeRequired: 0 },
+  mega:         { name: 'Mega Warehouse',       emoji: '🏢', capacity: 5000,  price: 30000,  prestigeRequired: 1 },
 };
 
 export const TRUCK_CONFIG: Record<TruckType, {
@@ -92,9 +95,43 @@ export const PRESTIGE_CONFIG = [
     emoji: '👑',
     requirement: 15000000,
     multiplier: 4.0,
-    description: '4× all income — maximum prestige achieved',
+    description: '4× all income — and the empire keeps expanding from here',
   },
 ];
+
+// ── Infinite prestige ──────────────────────────────────────────────────────
+// Past the three named milestones, prestige keeps going forever. Each tier
+// beyond Global Empire generates its own config: the income multiplier grows
+// ~1.5× per tier while the cash requirement grows ~7× per tier, so every
+// prestige is a meaningful boost that takes progressively longer to reach.
+export interface PrestigeTier {
+  level: number;
+  name: string;
+  emoji: string;
+  requirement: number;
+  multiplier: number;
+  description: string;
+}
+
+const PRESTIGE_NUMERALS = ['IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+
+export const getPrestigeConfig = (level: number): PrestigeTier | null => {
+  if (level <= 0) return null;
+  if (level <= PRESTIGE_CONFIG.length) return PRESTIGE_CONFIG[level - 1];
+  const last = PRESTIGE_CONFIG[PRESTIGE_CONFIG.length - 1]; // Global Empire
+  const stepsBeyond = level - PRESTIGE_CONFIG.length; // 1, 2, 3, ...
+  const multiplier = Math.round(last.multiplier * Math.pow(1.5, stepsBeyond) * 10) / 10;
+  const requirement = Math.round(last.requirement * Math.pow(7, stepsBeyond));
+  const numeral = PRESTIGE_NUMERALS[stepsBeyond - 1] || String(level);
+  return {
+    level,
+    name: `Tycoon Tier ${numeral}`,
+    emoji: '🌌',
+    requirement,
+    multiplier,
+    description: `${multiplier}× all income — empire tier ${level}`,
+  };
+};
 
 export const IAP_ITEMS = [
   {
@@ -153,9 +190,56 @@ export const EVENT_CONFIG: Record<EventType, { name: string; description: string
 };
 
 export const getPrestigeMultiplier = (level: number) => {
-  if (level === 0) return 1;
-  return PRESTIGE_CONFIG[Math.min(level - 1, PRESTIGE_CONFIG.length - 1)].multiplier;
+  if (level <= 0) return 1;
+  const cfg = getPrestigeConfig(level);
+  return cfg ? cfg.multiplier : 1;
 };
+
+// ── Gem shop ───────────────────────────────────────────────────────────────
+// Gems are the premium currency. Before this they had almost nowhere to go
+// (reroll orders / rush a truck). The gem shop gives them lasting purpose:
+//   • Permanent perks — repeatable, level-based, persist across prestige.
+//   • Consumables — one-shot boosts at a flat gem price.
+export const GEM_PERK_CONFIG: Record<GemPerkType, {
+  name: string; emoji: string; baseCost: number; costGrowth: number;
+  maxLevel: number; perLevel: number; // fractional bonus added per level
+  description: string;
+}> = {
+  goldenTouch: {
+    name: 'Golden Touch', emoji: '✨', baseCost: 12, costGrowth: 1.55, maxLevel: 25,
+    perLevel: 0.06, description: '+6% to ALL income, permanently. Stacks every level and survives prestige.',
+  },
+  fertileSoil: {
+    name: 'Fertile Soil', emoji: '🌱', baseCost: 10, costGrowth: 1.5, maxLevel: 25,
+    perLevel: 0.05, description: '+5% crops per harvest cycle on every field. Permanent, stacks each level.',
+  },
+  megaStorage: {
+    name: 'Mega Storage', emoji: '🏗️', baseCost: 10, costGrowth: 1.5, maxLevel: 20,
+    perLevel: 0.12, description: '+12% warehouse capacity across all storage. Permanent, stacks each level.',
+  },
+};
+
+export const GEM_CONSUMABLE_CONFIG: Record<GemConsumableType, {
+  name: string; emoji: string; cost: number; description: string;
+}> = {
+  instantGrow: {
+    name: 'Instant Grow', emoji: '⚡', cost: 6,
+    description: 'Instantly fill EVERY field to its ready capacity. Harvest the whole farm at once.',
+  },
+  timeWarp: {
+    name: 'Time Warp', emoji: '⏩', cost: 12,
+    description: 'Skip ahead 2 hours — collect that much idle income right now.',
+  },
+};
+
+// Cost of buying the next level of a perk (you currently own `level`).
+export const gemPerkCost = (id: GemPerkType, level: number) =>
+  Math.ceil(GEM_PERK_CONFIG[id].baseCost * Math.pow(GEM_PERK_CONFIG[id].costGrowth, level));
+
+type GemPerks = Partial<Record<GemPerkType, number>>;
+export const getGemIncomeMult  = (perks?: GemPerks) => 1 + GEM_PERK_CONFIG.goldenTouch.perLevel * (perks?.goldenTouch ?? 0);
+export const getGemYieldMult   = (perks?: GemPerks) => 1 + GEM_PERK_CONFIG.fertileSoil.perLevel * (perks?.fertileSoil ?? 0);
+export const getGemCapacityMult = (perks?: GemPerks) => 1 + GEM_PERK_CONFIG.megaStorage.perLevel * (perks?.megaStorage ?? 0);
 
 // Daily mission templates — system picks 3 per day
 import type { MissionType } from './types';

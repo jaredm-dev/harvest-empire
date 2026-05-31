@@ -9,6 +9,8 @@ export type UpgradeType =
   | 'harvestManager';
 export type FieldIssue = 'dry' | 'pests' | 'weeds' | 'brokenHarvester';
 export type EventType = 'market_surge' | 'bumper_crop' | 'delivery_bonus' | 'drought';
+export type GemPerkType = 'goldenTouch' | 'fertileSoil' | 'megaStorage';
+export type GemConsumableType = 'instantGrow' | 'timeWarp';
 
 export interface Field {
   id: string;
@@ -116,6 +118,10 @@ export interface GameStore {
   money: number;
   gems: number;
   totalEarned: number;
+  // Lifetime money earned across ALL prestiges. `totalEarned` resets each
+  // prestige (it drives the prestige-progress bar); this one never resets so
+  // the Statistics panel can show a true empire-wide total.
+  lifetimeEarned: number;
   prestigeLevel: number;
   fields: Field[];
   harvesters: Harvester[];
@@ -124,6 +130,9 @@ export interface GameStore {
   inventory: Partial<Record<CropType, number>>;
   unlockedCrops: CropType[];
   upgrades: Partial<Record<UpgradeType, boolean>>;
+  // Permanent gem-shop perks, keyed by perk id → level owned. Persists across
+  // prestige (gems are premium currency and should never reset).
+  gemPerks: Partial<Record<GemPerkType, number>>;
   toasts: Toast[];
   fieldCarts: FieldCart[];
   marketOrders: MarketOrder[];
@@ -168,8 +177,12 @@ export interface GameStore {
   sellTruck: (truckId: string) => boolean;
   sellHarvester: (harvesterId: string) => boolean;
   sellField: (fieldId: string) => boolean;
+  upgradeField: (fieldId: string) => boolean;
 
   simulateIAP: (itemId: string) => void;
+  grantCheat: () => void;
+  buyGemPerk: (id: GemPerkType) => boolean;
+  useGemConsumable: (id: GemConsumableType) => boolean;
   prestige: () => void;
   dismissToast: (id: string) => void;
   addToast: (message: string, type?: Toast['type']) => void;

@@ -3,21 +3,23 @@ import { useGameStore } from '../store';
 import {
   FIELD_CONFIG, HARVESTER_CONFIG, WAREHOUSE_CONFIG, TRUCK_CONFIG,
   CROP_CONFIG, IAP_ITEMS, UPGRADE_CONFIG,
+  GEM_PERK_CONFIG, GEM_CONSUMABLE_CONFIG, gemPerkCost,
 } from '../config';
-import type { FieldType, HarvesterType, WarehouseType, TruckType, CropType, UpgradeType } from '../types';
+import type { FieldType, HarvesterType, WarehouseType, TruckType, CropType, UpgradeType, GemPerkType, GemConsumableType } from '../types';
 import DrawerCloseButton from './DrawerCloseButton';
 import { formatMoney, formatNumber } from '../utils/format';
 
-type ShopTab = 'fields' | 'crops' | 'machines' | 'storage' | 'trucks' | 'upgrades' | 'iap';
+type ShopTab = 'fields' | 'crops' | 'machines' | 'storage' | 'trucks' | 'upgrades' | 'gems' | 'iap';
 
-const TABS: { id: ShopTab; icon: string; label: string; highlight?: boolean }[] = [
+const TABS: { id: ShopTab; icon: string; label: string; highlight?: boolean; gem?: boolean }[] = [
   { id: 'fields', icon: '▦', label: 'Fields' },
   { id: 'crops', icon: '●', label: 'Crops' },
   { id: 'machines', icon: '⚙', label: 'Machines' },
   { id: 'storage', icon: '▣', label: 'Storage' },
   { id: 'trucks', icon: '▰', label: 'Trucks' },
   { id: 'upgrades', icon: '✦', label: 'Systems' },
-  { id: 'iap', icon: '💎', label: 'Boosts', highlight: true },
+  { id: 'gems', icon: '💎', label: 'Gems', gem: true },
+  { id: 'iap', icon: '🎁', label: 'Boosts', highlight: true },
 ];
 
 interface ShopCardProps {
@@ -82,6 +84,66 @@ function ShopCard({ icon, name, desc, price, locked, owned, ownedLabel, onBuy }:
   );
 }
 
+interface GemCardProps {
+  icon: string;
+  name: string;
+  desc: string;
+  cost: number;
+  level?: number;     // current owned level (for repeatable perks)
+  maxLevel?: number;  // cap (for repeatable perks)
+  maxed?: boolean;
+  onBuy: () => void;
+}
+
+function GemCard({ icon, name, desc, cost, level, maxLevel, maxed, onBuy }: GemCardProps) {
+  const gems = useGameStore(s => s.gems ?? 0);
+  const canAfford = !maxed && gems >= cost;
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      background: 'linear-gradient(135deg, rgba(124,58,237,0.16), rgba(14,116,144,0.16))',
+      border: `1.5px solid ${maxed ? '#16a34a' : canAfford ? '#7c3aed' : '#3b2a5e'}`,
+      borderRadius: 12, padding: '12px 14px', marginBottom: 8,
+    }}>
+      <span style={{
+        width: 36, height: 36, borderRadius: 10,
+        display: 'grid', placeItems: 'center',
+        background: 'linear-gradient(145deg,#7c3aed,#4c1d95)',
+        color: 'white', fontSize: 16, flexShrink: 0,
+      }}>{icon}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+          <span style={{ color: 'white', fontWeight: 800, fontSize: 13 }}>{name}</span>
+          {level !== undefined && level > 0 && (
+            <span style={{ background: '#5b21b6', color: '#ddd6fe', fontSize: 10, padding: '1px 6px', borderRadius: 10, fontWeight: 800 }}>
+              Lv.{level}{maxLevel ? `/${maxLevel}` : ''}
+            </span>
+          )}
+        </div>
+        <span style={{ color: '#c4b5fd', fontSize: 11, lineHeight: 1.3 }}>{desc}</span>
+      </div>
+      {maxed ? (
+        <span style={{ fontSize: 11, color: '#4ade80', fontWeight: 800, flexShrink: 0 }}>MAXED</span>
+      ) : (
+        <button
+          onClick={onBuy}
+          style={{
+            background: canAfford ? 'linear-gradient(135deg,#7c3aed,#6d28d9)' : '#2a2147',
+            color: canAfford ? 'white' : '#6b5b95',
+            border: 'none', borderRadius: 10,
+            padding: '7px 12px', fontSize: 12, fontWeight: 800,
+            cursor: canAfford ? 'pointer' : 'not-allowed',
+            flexShrink: 0, whiteSpace: 'nowrap',
+          }}
+        >
+          💎 {cost}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function ShopDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [tab, setTab] = useState<ShopTab>('fields');
   const [loadingItem, setLoadingItem] = useState<string | null>(null);
@@ -127,6 +189,7 @@ export default function ShopDrawer({ open, onClose }: { open: boolean; onClose: 
           {TABS.map(t => {
             const active = tab === t.id;
             const highlight = t.highlight;
+            const gem = t.gem;
             return (
               <button
                 key={t.id}
@@ -136,11 +199,13 @@ export default function ShopDrawer({ open, onClose }: { open: boolean; onClose: 
                   padding: '6px 10px', borderRadius: 999, cursor: 'pointer',
                   fontSize: 12, fontWeight: 800,
                   background: active
-                    ? highlight ? 'linear-gradient(135deg,#b45309,#92400e)' : '#16a34a'
-                    : highlight ? 'linear-gradient(135deg,#78350f,#451a03)' : '#1e293b',
-                  color: active ? 'white' : highlight ? '#fcd34d' : '#94a3b8',
-                  border: highlight ? '1.5px solid #f59e0b' : 'none',
-                  boxShadow: highlight && active ? '0 0 12px rgba(251,191,36,0.4)' : 'none',
+                    ? highlight ? 'linear-gradient(135deg,#b45309,#92400e)'
+                      : gem ? 'linear-gradient(135deg,#7c3aed,#6d28d9)' : '#16a34a'
+                    : highlight ? 'linear-gradient(135deg,#78350f,#451a03)'
+                      : gem ? 'linear-gradient(135deg,#3b2a5e,#2a2147)' : '#1e293b',
+                  color: active ? 'white' : highlight ? '#fcd34d' : gem ? '#c4b5fd' : '#94a3b8',
+                  border: highlight ? '1.5px solid #f59e0b' : gem ? '1.5px solid #7c3aed' : 'none',
+                  boxShadow: active && (highlight ? '0 0 12px rgba(251,191,36,0.4)' : gem ? '0 0 12px rgba(124,58,237,0.45)' : 'none') || 'none',
                 }}
               >
                 {t.icon} {t.label}
@@ -262,6 +327,63 @@ export default function ShopDrawer({ open, onClose }: { open: boolean; onClose: 
                   onBuy={() => warn(store.buyUpgrade(type))}
                 />
               ))}
+            </>
+          )}
+
+          {tab === 'gems' && (
+            <>
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                background: 'linear-gradient(135deg, rgba(124,58,237,0.16), rgba(14,116,144,0.16))',
+                border: '1.5px solid #7c3aed', borderRadius: 12,
+                padding: '10px 14px', marginBottom: 12,
+              }}>
+                <span style={{ color: '#c4b5fd', fontSize: 12, fontWeight: 700 }}>
+                  Spend 💎 on permanent boosts that survive prestige.
+                </span>
+                <span style={{ color: 'white', fontSize: 15, fontWeight: 900, whiteSpace: 'nowrap' }}>
+                  💎 {formatNumber(Math.floor(store.gems ?? 0))}
+                </span>
+              </div>
+
+              <h3 style={{ color: '#a78bfa', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 800, margin: '0 0 8px' }}>
+                Permanent Perks
+              </h3>
+              {(Object.entries(GEM_PERK_CONFIG) as [GemPerkType, typeof GEM_PERK_CONFIG[GemPerkType]][]).map(([id, cfg]) => {
+                const level = store.gemPerks?.[id] ?? 0;
+                const maxed = level >= cfg.maxLevel;
+                return (
+                  <GemCard
+                    key={id}
+                    icon={cfg.emoji}
+                    name={cfg.name}
+                    desc={cfg.description}
+                    cost={gemPerkCost(id, level)}
+                    level={level}
+                    maxLevel={cfg.maxLevel}
+                    maxed={maxed}
+                    onBuy={() => store.buyGemPerk(id)}
+                  />
+                );
+              })}
+
+              <h3 style={{ color: '#a78bfa', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, fontWeight: 800, margin: '14px 0 8px' }}>
+                One-Shot Boosts
+              </h3>
+              {(Object.entries(GEM_CONSUMABLE_CONFIG) as [GemConsumableType, typeof GEM_CONSUMABLE_CONFIG[GemConsumableType]][]).map(([id, cfg]) => (
+                <GemCard
+                  key={id}
+                  icon={cfg.emoji}
+                  name={cfg.name}
+                  desc={cfg.description}
+                  cost={cfg.cost}
+                  onBuy={() => store.useGemConsumable(id)}
+                />
+              ))}
+
+              <p style={{ color: '#64748b', fontSize: 10, marginTop: 12, lineHeight: 1.4 }}>
+                Earn gems from rush orders, daily missions, login streaks, and the Boosts tab.
+              </p>
             </>
           )}
 

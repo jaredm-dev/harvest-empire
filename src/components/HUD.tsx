@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../store';
-import { PRESTIGE_CONFIG, EVENT_CONFIG } from '../config';
+import { EVENT_CONFIG, getPrestigeConfig, getPrestigeMultiplier } from '../config';
 import { formatMoney, formatNumber } from '../utils/format';
 
 // ← Update this to your Ko-fi page once you create one at ko-fi.com
@@ -41,9 +41,9 @@ export default function HUD({ onPrestige, onSettings, onStats }: Props) {
     setDisplay(money);
   }, [money]);
 
-  const nextP = PRESTIGE_CONFIG[prestigeLevel];
+  const nextP = getPrestigeConfig(prestigeLevel + 1);
   const pct = nextP ? Math.min(totalEarned / nextP.requirement, 1) * 100 : 100;
-  const multiplier = [1, 1.5, 2.5, 4][Math.min(prestigeLevel, 3)];
+  const multiplier = getPrestigeMultiplier(prestigeLevel);
   const prestigeReady = Boolean(nextP && totalEarned >= nextP.requirement);
 
   return (

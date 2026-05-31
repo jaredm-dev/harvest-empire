@@ -66,14 +66,21 @@ const FIELD_SLOTS = [
   { col: 0, row: 16 }, { col: 8, row: 16 }, { col: 16, row: 16 },
 ];
 
+// Visual footprint (in tiles) of each field type. Field slots sit on an
+// 8-tile grid, so a footprint must stay <= 6 or it spills into the neighbouring
+// plot (and the right-hand column would collide with the warehouse at col 23).
+// Industrial was 8 — that's why it visibly overflowed onto other fields.
 const FIELD_TILE_SIZE: Record<string, number> = {
-  starter: 3, small: 4, medium: 5, large: 6, industrial: 8,
+  starter: 3, small: 4, medium: 5, large: 6, industrial: 6,
 };
 
 // Building positions
 const WH        = { col: 23, row: 2,  w: 5, d: 3, h: 52, label: 'WAREHOUSE' };
 const MKT       = { col: 23, row: 10, w: 4, d: 3, h: 42, label: 'MARKET' };
-const HOMESTEAD = { col: 0, row: 3, w: 3, d: 3, h: 40, label: 'HOMESTEAD' };
+// Homestead lives in the right-hand building strip (below the market), clear
+// of the field grid. It used to sit at col0/row3 — directly under the starter
+// field — which blocked upgrading the starter plot to a larger size.
+const HOMESTEAD = { col: 23, row: 16, w: 3, d: 3, h: 40, label: 'HOMESTEAD' };
 // Removed BARN_DECO — was purely decorative and stretched the world to the left.
 
 // Road tiles — connects warehouse to market
@@ -134,6 +141,13 @@ function cropPlantPositions(col: number, row: number) {
   ];
 }
 
+const issueLabelShort = (issue: NonNullable<Field['issue']>) => ({
+  dry: 'Dry soil',
+  pests: 'Pests',
+  weeds: 'Weeds',
+  brokenHarvester: 'Harvester',
+}[issue]);
+
 const CROP_STYLE: Record<Field['crop'], {
   stem: string;
   leaf: string;
@@ -184,6 +198,33 @@ function CropSprite({ field, col, row, plantIndex }: {
         <ellipse cx="0" cy="5" rx="9" ry="3" fill="rgba(0,0,0,0.22)" />
         {[[-5, 0, -22], [0, -2, 0], [5, 0, 22], [-2, 2, -8], [3, 2, 10]].map(([x, y, r], i) => (
           <ellipse key={i} cx={x} cy={y - 8} rx="5" ry="10" fill={i % 2 ? style.leaf : style.fruit} stroke="#4d7c0f" strokeWidth="0.6" transform={`rotate(${r} ${x} ${y - 8})`} />
+        ))}
+      </g>
+    );
+  }
+
+  if (field.crop === 'strawberry') {
+    // Low, bushy plant with broad leaves and small heart-shaped berries that
+    // hang near the ground — visually distinct from the tall tomato plant.
+    return (
+      <g transform={`translate(${p.x},${p.y}) scale(${scale}) rotate(${sway})`}>
+        {!IS_MOBILE && <animateTransform attributeName="transform" type="rotate" values="-2;2;-2" dur={`${2.8 + plantIndex * 0.18}s`} repeatCount="indefinite" additive="sum" />}
+        <ellipse cx="0" cy="5" rx="9" ry="3" fill="rgba(0,0,0,0.22)" />
+        {/* low fan of leaves */}
+        {[[-7, -2, -40], [0, -5, 0], [7, -2, 40]].map(([x, y, r], i) => (
+          <ellipse key={i} cx={x} cy={y - 2} rx="5.5" ry="4" fill={i % 2 ? style.leaf : style.stem} stroke="#166534" strokeWidth="0.6" transform={`rotate(${r} ${x} ${y - 2})`} />
+        ))}
+        {/* white blossom */}
+        <circle cx="-1" cy="-9" r="2.4" fill="#fff" stroke="#fde68a" strokeWidth="0.6" />
+        <circle cx="-1" cy="-9" r="0.9" fill="#facc15" />
+        {/* heart-shaped berries with seeds */}
+        {[[-3, 2], [4, 1]].map(([bx, by], i) => (
+          <g key={i} transform={`translate(${bx},${by})`}>
+            <path d="M0 4 C-4 0 -4 -4 -1.5 -4 C0 -4 0 -2.5 0 -2 C0 -2.5 0 -4 1.5 -4 C4 -4 4 0 0 4Z" fill={style.fruit} stroke="#7f1d1d" strokeWidth="0.6" />
+            <circle cx="-1.4" cy="-1.5" r="0.4" fill={style.accent} />
+            <circle cx="1.2" cy="-1.2" r="0.4" fill={style.accent} />
+            <circle cx="0" cy="0.6" r="0.4" fill={style.accent} />
+          </g>
         ))}
       </g>
     );
@@ -2028,6 +2069,10 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
           const ready = field.readyToPick >= 1;
           const issue = field.issue;
           const condition = Math.round(field.condition ?? 100);
+          const readyCount = Math.floor(field.readyToPick);
+          // Growth toward the next unit (0..1). When something is already
+          // ready to pick we treat the bar as full.
+          const growthPct = ready ? 100 : Math.min(100, Math.max(0, field.growthProgress * 100));
           const cropShort = ({
             tomato: 'Tomato',
             lettuce: 'Lettuce',
@@ -2050,11 +2095,40 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
                 left: S.x - 68,
                 top: S.y - 2,
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'stretch',
                 gap: 3,
+                width: 137,
                 pointerEvents: 'none', // children re-enable
               }}
             >
+              {/* Pulsing alert chip — makes a field problem impossible to miss
+                  (players said issues were hard to notice). Tapping it jumps
+                  straight to the field's fix panel. */}
+              {issue && (
+                <button
+                  data-world-control="true"
+                  onPointerDown={event => event.stopPropagation()}
+                  onClick={event => { event.stopPropagation(); onFieldClick(field.id); }}
+                  aria-label={`Problem on ${cropShort} ${fieldShort} — tap to fix`}
+                  style={{
+                    alignSelf: 'center',
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '2px 8px', borderRadius: 999,
+                    background: 'linear-gradient(180deg, #ef4444, #b91c1c)',
+                    border: '1px solid #fecaca',
+                    color: '#fff', fontSize: 9, fontWeight: 900,
+                    fontFamily: 'inherit', cursor: 'pointer',
+                    pointerEvents: 'auto', whiteSpace: 'nowrap',
+                    boxShadow: '0 4px 10px rgba(185,28,28,0.5)',
+                    animation: 'field-alert-pulse 1s ease-in-out infinite',
+                  }}
+                >
+                  ⚠ {issueLabelShort(issue)}
+                </button>
+              )}
+
+              <div style={{ display: 'flex', alignItems: 'stretch', gap: 3 }}>
               {/* Main label — harvests when ready, opens settings when not */}
               <button
                 data-world-control="true"
@@ -2093,7 +2167,7 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
                 }}
               >
                 {cropShort} {fieldShort}
-                {issue ? ' - Fix' : ready ? ' - Ready' : condition < 80 ? ' - Tend' : ''}
+                {issue ? ' - Fix' : ready ? ` - Ready (${readyCount})` : condition < 80 ? ' - Tend' : ''}
                 {assignedHarv && ' +Auto'}
               </button>
               {/* Settings ⚙️ — always opens the field assign drawer, even
@@ -2126,6 +2200,34 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
               >
                 ⚙
               </button>
+              </div>
+
+              {/* Crop growth progress bar — fills as the next harvest matures.
+                  Turns gold the moment crops are ready to pick. */}
+              <div
+                style={{
+                  height: 5,
+                  borderRadius: 999,
+                  background: 'rgba(8,20,12,0.55)',
+                  border: '1px solid rgba(0,0,0,0.3)',
+                  overflow: 'hidden',
+                }}
+                aria-hidden="true"
+              >
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${growthPct}%`,
+                    borderRadius: 999,
+                    background: ready
+                      ? 'linear-gradient(90deg, #fbbf24, #f59e0b)'
+                      : issue
+                        ? 'linear-gradient(90deg, #f87171, #b91c1c)'
+                        : 'linear-gradient(90deg, #4ade80, #16a34a)',
+                    transition: 'width 0.25s linear',
+                  }}
+                />
+              </div>
             </div>
           );
         })}
@@ -2165,6 +2267,10 @@ export default function GameWorld({ onWarehouseClick, onMarketClick, onFieldClic
             : 'Storage Full - Sell Crops'}
         </button>
       )}
+
+      {/* Static atmospheric vignette — adds depth so the farm doesn't read
+          as a flat 2D sheet. CSS-only, painted once, no per-frame cost. */}
+      <div className="world-atmosphere" />
 
       {/* Navigation toggle removed — entire farm is visible at once now. */}
     </div>

@@ -1,11 +1,14 @@
 import { useGameStore } from '../store';
 import { formatMoney, formatNumber } from '../utils/format';
+import { ACHIEVEMENT_CONFIG } from '../config';
 import DrawerCloseButton from './DrawerCloseButton';
 
 // Lifetime statistics — selects individual primitive values from the store
 // (not whole objects) so this component does not re-render every tick.
 export default function StatsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const totalEarned = useGameStore(s => s.totalEarned);
+  // Lifetime earnings never reset on prestige; fall back to the per-run
+  // totalEarned for legacy saves that predate the lifetimeEarned field.
+  const totalEarned = useGameStore(s => s.lifetimeEarned || s.totalEarned);
   const cropsHarvested = useGameStore(s => s.totalCropsHarvested || 0);
   const deliveries = useGameStore(s => s.totalDeliveriesCompleted || 0);
   const ordersFilled = useGameStore(s => s.marketOrdersCompleted || 0);
@@ -18,6 +21,9 @@ export default function StatsPanel({ open, onClose }: { open: boolean; onClose: 
   const harvesterCount = useGameStore(s => s.harvesters.length);
   const warehouseCount = useGameStore(s => s.warehouses.length);
   const unlockedCrops = useGameStore(s => s.unlockedCrops.length);
+  const unlockedAchievements = useGameStore(s => s.achievements || []);
+  const unlockedSet = new Set(unlockedAchievements);
+  const allAchievements = Object.entries(ACHIEVEMENT_CONFIG);
 
   const daysPlayed = gameStartedAt
     ? Math.max(1, Math.floor((Date.now() - gameStartedAt) / 86_400_000))
@@ -79,6 +85,33 @@ export default function StatsPanel({ open, onClose }: { open: boolean; onClose: 
             {stat('Warehouses', formatNumber(warehouseCount), '▣')}
             {stat('Trucks', formatNumber(truckCount), '🚛')}
             {stat('Crops unlocked', formatNumber(unlockedCrops) + ' / 6', '🌱')}
+          </div>
+
+          <p style={{ color: '#475569', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 18, marginBottom: 8 }}>
+            Achievements — {unlockedAchievements.length} / {allAchievements.length}
+          </p>
+          <div style={{ display: 'grid', gap: 6 }}>
+            {allAchievements.map(([id, cfg]) => {
+              const got = unlockedSet.has(id);
+              return (
+                <div key={id} style={{
+                  display: 'flex', alignItems: 'center', gap: 11,
+                  background: got ? 'rgba(22,101,52,0.22)' : '#0f172a',
+                  border: got ? '1px solid rgba(34,197,94,0.4)' : '1px solid #1e293b',
+                  borderRadius: 12, padding: '10px 12px',
+                  opacity: got ? 1 : 0.6,
+                }}>
+                  <div style={{ fontSize: 22, lineHeight: 1, width: 28, textAlign: 'center', filter: got ? 'none' : 'grayscale(1)' }}>
+                    {got ? cfg.emoji : '🔒'}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: got ? '#fff' : '#94a3b8', fontSize: 13, fontWeight: 800 }}>{cfg.name}</div>
+                    <div style={{ color: '#64748b', fontSize: 11, marginTop: 1 }}>{cfg.description}</div>
+                  </div>
+                  {got && <span style={{ color: '#4ade80', fontSize: 14, fontWeight: 900 }}>✓</span>}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

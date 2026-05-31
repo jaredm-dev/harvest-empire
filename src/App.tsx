@@ -25,6 +25,7 @@ export default function App() {
   const addToast = useGameStore(s => s.addToast);
   const applyOfflineProgress = useGameStore(s => s.applyOfflineProgress);
   const refreshDailyMissions = useGameStore(s => s.refreshDailyMissions);
+  const grantCheat = useGameStore(s => s.grantCheat);
   const hasSeenTutorial = useGameStore(s => s.hasSeenTutorial);
   // Select just the count as a number — stable equality, no re-render on every tick
   const readyMissionCount = useGameStore(s => {
@@ -72,6 +73,27 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [modal]);
+
+  // Secret cheat code — type the word to drop a $15M test injection for
+  // exercising late-game systems. We keep a rolling buffer of the last few
+  // letters typed and fire when it ends with the code.
+  useEffect(() => {
+    const CODE = 'rtard';
+    let buffer = '';
+    const onKey = (e: KeyboardEvent) => {
+      // Ignore when typing into an input/textarea (none exist today, but be safe)
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key.length !== 1 || !/[a-z]/i.test(e.key)) return;
+      buffer = (buffer + e.key.toLowerCase()).slice(-CODE.length);
+      if (buffer === CODE) {
+        grantCheat();
+        buffer = '';
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [grantCheat]);
 
   // Handle return from Stripe Checkout
   useEffect(() => {

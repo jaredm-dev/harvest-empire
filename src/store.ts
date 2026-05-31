@@ -1,11 +1,13 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { throttledStorage } from './utils/throttled-storage';
-import type { GameStore, Field, Harvester, Warehouse, Truck, CropType, FieldIssue, Toast, FieldCart, MarketOrder, GameEvent, EventType, DailyMission } from './types';
+import type { GameStore, Field, Harvester, Warehouse, Truck, CropType, FieldType, FieldIssue, Toast, FieldCart, MarketOrder, GameEvent, EventType, DailyMission, GemPerkType } from './types';
 import {
   CROP_CONFIG, FIELD_CONFIG, HARVESTER_CONFIG, WAREHOUSE_CONFIG, TRUCK_CONFIG,
-  PRESTIGE_CONFIG, IAP_ITEMS, MAX_FIELDS, UPGRADE_CONFIG, getPrestigeMultiplier,
+  IAP_ITEMS, MAX_FIELDS, UPGRADE_CONFIG, getPrestigeMultiplier, getPrestigeConfig,
   ACHIEVEMENT_CONFIG, EVENT_CONFIG, MISSION_POOL,
+  GEM_PERK_CONFIG, GEM_CONSUMABLE_CONFIG, gemPerkCost,
+  getGemIncomeMult, getGemYieldMult, getGemCapacityMult,
 } from './config';
 import { formatMoney } from './utils/format';
 import { Sound } from './utils/sound';
@@ -90,6 +92,38 @@ const issueLabel = (issue: FieldIssue) => ({
   brokenHarvester: 'Broken harvester',
 }[issue]);
 
+// Total storage capacity = sum of warehouse capacities, scaled by the
+// Mega Storage gem perk. Centralised so every place that checks "is storage
+// full?" stays consistent (tick, manual harvest, collect-all).
+const totalCapacity = (
+  warehouses: Warehouse[],
+  gemPerks?: Partial<Record<GemPerkType, number>>,
+) => Math.floor(
+  warehouses.reduce((s, w) => s + WAREHOUSE_CONFIG[w.type].capacity, 0) * getGemCapacityMult(gemPerks),
+);
+
+// Rough $/sec the farm makes while idle, bottlenecked by whichever is slower:
+// truck delivery throughput or harvester supply. Halved because idle is less
+// efficient than active play. Used by offline progress AND the Time Warp gem
+// consumable so both stay consistent.
+const estimateIdleRatePerSec = (state: GameStore): number => {
+  const pm = getPrestigeMultiplier(state.prestigeLevel);
+  const gemIncome = getGemIncomeMult(state.gemPerks);
+  const speedMult = state.upgrades?.fasterTrucks ? 1.3 : 1;
+  const marketBonus = state.upgrades?.marketStand ? 1.1 : 1;
+  const avgCropValue = state.unlockedCrops.length > 0
+    ? state.unlockedCrops.reduce((s, c) => s + CROP_CONFIG[c].baseValue, 0) / state.unlockedCrops.length
+    : 5;
+  const truckIncomePerSec = state.trucks.reduce((sum, t) => {
+    const tc = TRUCK_CONFIG[t.type];
+    const tripTime = tc.deliveryTime / speedMult;
+    return sum + (tc.capacity * avgCropValue * tc.valueMultiplier * pm * marketBonus * gemIncome) / tripTime;
+  }, 0);
+  const harvesterRatePerSec = state.harvesters.reduce((sum, h) => sum + HARVESTER_CONFIG[h.type].harvestRate, 0);
+  const supplyIncomePerSec = harvesterRatePerSec * avgCropValue * pm * gemIncome;
+  return Math.min(truckIncomePerSec, supplyIncomePerSec) * 0.5;
+};
+
 const INITIAL_FIELDS: Field[] = [{
   id: 'field-start',
   type: 'starter',
@@ -133,6 +167,7 @@ const INITIAL_STATE = {
   money: 500,
   gems: 25,
   totalEarned: 0,
+  lifetimeEarned: 0,
   prestigeLevel: 0,
   fields: INITIAL_FIELDS,
   harvesters: [] as Harvester[],
@@ -141,6 +176,7 @@ const INITIAL_STATE = {
   inventory: {} as Partial<Record<CropType, number>>,
   unlockedCrops: ['tomato'] as CropType[],
   upgrades: {},
+  gemPerks: {} as Partial<Record<GemPerkType, number>>,
   toasts: [] as Toast[],
   fieldCarts: [] as FieldCart[],
   marketOrders: generateMarketOrders(['tomato'], 0),
@@ -187,6 +223,8 @@ export const useGameStore = create<GameStore>()(
       tick: (delta: number) => {
         const state = get();
         const pm = getPrestigeMultiplier(state.prestigeLevel);
+        const gemIncome = getGemIncomeMult(state.gemPerks);
+        const gemYield = getGemYieldMult(state.gemPerks);
         const upgrades = state.upgrades || {};
         let moneyEarned = 0;
 
@@ -215,7 +253,10 @@ export const useGameStore = create<GameStore>()(
             if (field.harvesterId && !upgrades.mechanic && Math.random() < 0.12) issue = 'brokenHarvester';
           }
 
-          if (issue && upgrades.autoTend && Math.random() < delta / 90) {
+          // Farmhand Crew (autoTend): automatically clears field issues.
+          // ~12s average to fix so the player actually notices it working,
+          // instead of the old ~90s which felt like nothing was happening.
+          if (issue && issue !== 'brokenHarvester' && upgrades.autoTend && Math.random() < delta / 12) {
             issue = null;
             condition = Math.min(100, condition + 15);
           }
@@ -229,7 +270,7 @@ export const useGameStore = create<GameStore>()(
           const condMult  = Math.max(0.35, condition / 100);
           const issueMult = issue ? 0.45 : 1;
           const growMult  = upgrades.irrigation ? 1.2 : 1;
-          const yieldBonus = upgrades.extraYield ? 1.15 : 1;
+          const yieldBonus = (upgrades.extraYield ? 1.15 : 1) * gemYield;
 
           growthProgress += (delta / cc.growTime) * condMult * issueMult * growMult * eventGrowthMult;
           while (growthProgress >= 1) {
@@ -278,7 +319,7 @@ export const useGameStore = create<GameStore>()(
 
         // --- Field carts: spawn from filled buffers + tick existing ---
         const newInventory = { ...state.inventory };
-        const totalCap = state.warehouses.reduce((s, w) => s + WAREHOUSE_CONFIG[w.type].capacity, 0);
+        const totalCap = totalCapacity(state.warehouses, state.gemPerks);
 
         const haulingFields = new Set(
           state.fieldCarts.filter(c => c.status === 'hauling').map(c => c.fieldId),
@@ -287,7 +328,12 @@ export const useGameStore = create<GameStore>()(
         const cartsToSpawn: FieldCart[] = [];
         const finalFields = updatedFields.map(field => {
           const buf = field.harvestBuffer ?? 0;
-          if (buf >= MIN_CART_LOAD && field.harvesterId && !haulingFields.has(field.id)) {
+          // A cart hauls the buffer to the warehouse if the field has a
+          // dedicated harvester OR the Harvest Manager upgrade is active.
+          // Without this, Harvest Manager fields filled their buffer forever
+          // and crops never reached storage — the upgrade looked broken.
+          const canHaul = field.harvesterId || upgrades.harvestManager;
+          if (buf >= MIN_CART_LOAD && canHaul && !haulingFields.has(field.id)) {
             const cargo = Math.floor(buf);
             cartsToSpawn.push({
               id: uid(), fieldId: field.id, cropType: field.crop,
@@ -355,7 +401,7 @@ export const useGameStore = create<GameStore>()(
               const marketBonus = state.upgrades?.marketStand ? 1.1 : 1;
               for (const [crop, amt] of Object.entries(truck.cargoTypes)) {
                 const cc = CROP_CONFIG[crop as CropType];
-                earned += (amt || 0) * cc.baseValue * tc.valueMultiplier * pm * marketBonus * eventDeliveryMult;
+                earned += (amt || 0) * cc.baseValue * tc.valueMultiplier * pm * marketBonus * eventDeliveryMult * gemIncome;
               }
               moneyEarned += earned;
               // Truck deliveries are silent on toast — floating "+$X" and the
@@ -438,6 +484,7 @@ export const useGameStore = create<GameStore>()(
             inventory: newInventory,
             money: s.money + moneyEarned,
             totalEarned: s.totalEarned + moneyEarned,
+            lifetimeEarned: (s.lifetimeEarned || 0) + moneyEarned,
             totalDeliveriesCompleted: (s.totalDeliveriesCompleted || 0) + deliveriesThisTick,
             achievements: newAchievements.length ? [...new Set([...(s.achievements || []), ...newAchievements])] : (s.achievements || []),
             activeEvents: updatedEvents,
@@ -468,7 +515,7 @@ export const useGameStore = create<GameStore>()(
         if (!field) return { harvested: 0, reason: 'missing' };
         if (field.readyToPick < 1) return { harvested: 0, reason: 'not_ready' };
 
-        const totalCap = state.warehouses.reduce((s, w) => s + WAREHOUSE_CONFIG[w.type].capacity, 0);
+        const totalCap = totalCapacity(state.warehouses, state.gemPerks);
         const currentTotal = Object.values(state.inventory).reduce((s, v) => s + (v || 0), 0);
         const space = totalCap - currentTotal;
         if (space <= 0) {
@@ -511,7 +558,7 @@ export const useGameStore = create<GameStore>()(
       collectReadyFields: () => {
         const state = get();
         const upgrades = state.upgrades || {};
-        const totalCap = state.warehouses.reduce((s, w) => s + WAREHOUSE_CONFIG[w.type].capacity, 0);
+        const totalCap = totalCapacity(state.warehouses, state.gemPerks);
         const currentTotal = Object.values(state.inventory).reduce((s, v) => s + (v || 0), 0);
         let remainingSpace = totalCap - currentTotal;
 
@@ -633,9 +680,10 @@ export const useGameStore = create<GameStore>()(
         const pm = getPrestigeMultiplier(state.prestigeLevel);
         const premBonus = state.upgrades?.premiumContracts ? 1.25 : 1;
         const surgeBonus = (state.activeEvents || []).some(e => e.type === 'market_surge') ? 2.0 : 1.0;
+        const gemIncome = getGemIncomeMult(state.gemPerks);
         let earned = 0;
         for (const [crop, amt] of Object.entries(state.inventory)) {
-          earned += (amt || 0) * CROP_CONFIG[crop as CropType].baseValue * pm * premBonus * surgeBonus;
+          earned += (amt || 0) * CROP_CONFIG[crop as CropType].baseValue * pm * premBonus * surgeBonus * gemIncome;
         }
         if (earned <= 0) return;
         const rounded = Math.floor(earned);
@@ -646,6 +694,7 @@ export const useGameStore = create<GameStore>()(
           inventory: {},
           money: s.money + rounded,
           totalEarned: s.totalEarned + rounded,
+          lifetimeEarned: (s.lifetimeEarned || 0) + rounded,
           dailyMissions: bumpMissions(bumpMissions(s.dailyMissions || [], 'sell_inventory', 1), 'earn_money', rounded),
         }));
       },
@@ -670,16 +719,20 @@ export const useGameStore = create<GameStore>()(
         }
 
         Sound.cash();
+        // Gem "Golden Touch" perk boosts order payouts too, so every income
+        // source benefits from the same multiplier.
+        const reward = Math.floor(order.rewardMoney * getGemIncomeMult(state.gemPerks));
         // No toast — player just clicked Fill Order. The cash jingle, gem
         // counter, and floating "+$X" provide the feedback. Gems get a brief
         // toast only when awarded so the player notices.
         set(s => ({
           inventory,
-          money: s.money + order.rewardMoney,
+          money: s.money + reward,
           gems: (s.gems ?? 0) + order.rewardGems,
-          totalEarned: s.totalEarned + order.rewardMoney,
+          totalEarned: s.totalEarned + reward,
+          lifetimeEarned: (s.lifetimeEarned || 0) + reward,
           marketOrdersCompleted: (s.marketOrdersCompleted || 0) + 1,
-          dailyMissions: bumpMissions(bumpMissions(s.dailyMissions || [], 'complete_orders', 1), 'earn_money', order.rewardMoney),
+          dailyMissions: bumpMissions(bumpMissions(s.dailyMissions || [], 'complete_orders', 1), 'earn_money', reward),
           marketOrders: orders.map(o => {
             if (o.id !== orderId) return o;
             // Don't reuse a customer already on the board
@@ -777,6 +830,45 @@ export const useGameStore = create<GameStore>()(
           toasts: [...s.toasts, {
             id: uid(),
             message: `Sold ${FIELD_CONFIG[field.type].name} field for ${formatMoney(refund)}`,
+            type: 'success' as const,
+          }].slice(-5),
+        }));
+        return true;
+      },
+
+      // Upgrade a field in place to the next size tier (starter → small →
+      // medium → large → industrial). Crops, harvester and condition carry
+      // over — you just pay the new tier's price for a bigger plot. This lets
+      // players grow the homestead/starter field instead of being stuck with
+      // a tiny permanent plot.
+      upgradeField: (fieldId) => {
+        const order: FieldType[] = ['starter', 'small', 'medium', 'large', 'industrial'];
+        const state = get();
+        const field = state.fields.find(f => f.id === fieldId);
+        if (!field) return false;
+        const idx = order.indexOf(field.type);
+        if (idx < 0 || idx >= order.length - 1) {
+          state.addToast('This field is already the largest size.', 'warning');
+          return false;
+        }
+        const next = order[idx + 1];
+        const cfg = FIELD_CONFIG[next];
+        if (cfg.prestigeRequired > state.prestigeLevel) {
+          state.addToast(`Reach Prestige ${cfg.prestigeRequired} to upgrade to ${cfg.name}.`, 'warning');
+          return false;
+        }
+        if (state.money < cfg.price) {
+          state.addToast(`Need ${formatMoney(cfg.price)} to upgrade to ${cfg.name}.`, 'warning');
+          return false;
+        }
+        Sound.cash();
+        set(s => ({
+          money: s.money - cfg.price,
+          fields: s.fields.map(f => f.id === fieldId ? { ...f, type: next } : f),
+          dailyMissions: bumpMissions(s.dailyMissions || [], 'buy_anything', 1),
+          toasts: [...s.toasts, {
+            id: uid(),
+            message: `Field upgraded to ${cfg.name}! Bigger yields ahead.`,
             type: 'success' as const,
           }].slice(-5),
         }));
@@ -924,6 +1016,7 @@ export const useGameStore = create<GameStore>()(
             money: s.money + 1000000 * mult,
             gems: (s.gems ?? 0) + 400 * mult,
             totalEarned: s.totalEarned + 1000000 * mult,
+            lifetimeEarned: (s.lifetimeEarned || 0) + 1000000 * mult,
             prestigeLevel: Math.max(s.prestigeLevel, 1),
             unlockedCrops: ['tomato', 'lettuce', 'strawberry', 'corn'],
           }));
@@ -938,10 +1031,116 @@ export const useGameStore = create<GameStore>()(
         }));
       },
 
+      // Dev/test cheat — grants a big cash injection so late-game systems can
+      // be exercised without hours of grinding. Triggered by typing a secret
+      // code (see App.tsx keyboard listener). Money is added to spendable
+      // cash AND counts toward prestige progress + lifetime stats.
+      grantCheat: () => {
+        const amount = 15_000_000;
+        Sound.cash();
+        celebrate('large');
+        set(s => ({
+          money: s.money + amount,
+          totalEarned: s.totalEarned + amount,
+          lifetimeEarned: (s.lifetimeEarned || 0) + amount,
+          toasts: [...s.toasts, {
+            id: uid(),
+            message: `🤑 Cheat code! +${formatMoney(amount)} — go wild.`,
+            type: 'success' as const,
+          }].slice(-5),
+        }));
+      },
+
+      // Buy the next level of a permanent gem perk. Perks stack and survive
+      // prestige — they're the main long-term home for gems.
+      buyGemPerk: (id) => {
+        const state = get();
+        const cfg = GEM_PERK_CONFIG[id];
+        const level = state.gemPerks?.[id] ?? 0;
+        if (level >= cfg.maxLevel) {
+          state.addToast(`${cfg.name} is already maxed out.`, 'warning');
+          return false;
+        }
+        const cost = gemPerkCost(id, level);
+        if ((state.gems ?? 0) < cost) {
+          state.addToast(`Need ${cost} 💎 for the next ${cfg.name} level.`, 'warning');
+          return false;
+        }
+        Sound.cash();
+        celebrate('small');
+        set(s => ({
+          gems: (s.gems ?? 0) - cost,
+          gemPerks: { ...(s.gemPerks || {}), [id]: level + 1 },
+          toasts: [...s.toasts, {
+            id: uid(),
+            message: `${cfg.emoji} ${cfg.name} Lv.${level + 1} — boost is permanent!`,
+            type: 'success' as const,
+          }].slice(-5),
+        }));
+        return true;
+      },
+
+      // Spend gems on a one-shot consumable boost.
+      useGemConsumable: (id) => {
+        const state = get();
+        const cfg = GEM_CONSUMABLE_CONFIG[id];
+        if ((state.gems ?? 0) < cfg.cost) {
+          state.addToast(`Need ${cfg.cost} 💎 for ${cfg.name}.`, 'warning');
+          return false;
+        }
+
+        if (id === 'instantGrow') {
+          // Top every field up to its ready capacity for an instant full farm.
+          Sound.cash();
+          celebrate('medium');
+          set(s => ({
+            gems: (s.gems ?? 0) - cfg.cost,
+            fields: s.fields.map(f => ({
+              ...normalizeField(f),
+              readyToPick: FIELD_CONFIG[f.type].capacity,
+              growthProgress: 0,
+              readyAge: 0,
+            })),
+            toasts: [...s.toasts, {
+              id: uid(),
+              message: `⚡ Instant Grow! Every field is bursting — go collect.`,
+              type: 'success' as const,
+            }].slice(-5),
+          }));
+          return true;
+        }
+
+        if (id === 'timeWarp') {
+          // Grant 2 hours of idle income immediately.
+          const WARP_SECONDS = 2 * 3600;
+          const earned = Math.floor(estimateIdleRatePerSec(state) * WARP_SECONDS);
+          if (earned <= 0) {
+            state.addToast('Build some trucks and harvesters first — no idle income to warp yet.', 'warning');
+            return false;
+          }
+          Sound.cash();
+          celebrate('large');
+          set(s => ({
+            gems: (s.gems ?? 0) - cfg.cost,
+            money: s.money + earned,
+            totalEarned: s.totalEarned + earned,
+            lifetimeEarned: (s.lifetimeEarned || 0) + earned,
+            toasts: [...s.toasts, {
+              id: uid(),
+              message: `⏩ Time Warp! +${formatMoney(earned)} from 2 hours of idle income.`,
+              type: 'success' as const,
+            }].slice(-5),
+          }));
+          return true;
+        }
+
+        return false;
+      },
+
       prestige: () => {
         const state = get();
         const nextLevel = state.prestigeLevel + 1;
-        const cfg = PRESTIGE_CONFIG[nextLevel - 1];
+        const cfg = getPrestigeConfig(nextLevel);
         if (!cfg || state.totalEarned < cfg.requirement) return;
         Sound.fanfare();
         celebrate('large');
@@ -950,7 +1149,11 @@ export const useGameStore = create<GameStore>()(
         if (nextLevel >= 1) newUnlocked.push('blueberry');
         if (nextLevel >= 2) newUnlocked.push('truffle');
 
-        // Preserve meta-progression: achievements, missions, streak, first purchase
+        // Preserve meta-progression: achievements, missions, streak, first
+        // purchase, and all LIFETIME empire stats. `totalEarned` is the one
+        // thing that intentionally resets (it gates the next prestige), but
+        // lifetime earnings / crops / deliveries / orders are empire-wide and
+        // must carry over so the Statistics panel doesn't wipe on prestige.
         const preserve = {
           achievements: state.achievements,
           dailyMissions: state.dailyMissions,
@@ -959,8 +1162,16 @@ export const useGameStore = create<GameStore>()(
           lastLoginDate: state.lastLoginDate,
           hasFirstPurchase: state.hasFirstPurchase,
           hasSeenTutorial: state.hasSeenTutorial,
+          lifetimeEarned: state.lifetimeEarned,
           totalCropsHarvested: state.totalCropsHarvested,
           totalDeliveriesCompleted: state.totalDeliveriesCompleted,
+          marketOrdersCompleted: state.marketOrdersCompleted,
+          gameStartedAt: state.gameStartedAt,
+          // Premium currency and the perks bought with it are meta-progression
+          // — they must NOT reset on prestige (previously gems silently reset
+          // to the starting 25, making any gem investment pointless).
+          gems: state.gems,
+          gemPerks: state.gemPerks,
         };
 
         set({
@@ -1068,36 +1279,18 @@ export const useGameStore = create<GameStore>()(
           return;
         }
 
-        // Compute approximate offline earnings: trucks deliver at a rate based on capacity * delivery time
-        const pm = getPrestigeMultiplier(state.prestigeLevel);
-        const speedMult = state.upgrades?.fasterTrucks ? 1.3 : 1;
-        const marketBonus = state.upgrades?.marketStand ? 1.1 : 1;
-
-        // Average crop value across unlocked crops
-        const avgCropValue = state.unlockedCrops.length > 0
-          ? state.unlockedCrops.reduce((s, c) => s + CROP_CONFIG[c].baseValue, 0) / state.unlockedCrops.length
-          : 5;
-
-        // Estimate income: each truck completes capacity * valueMultiplier per (deliveryTime/speedMult) seconds
-        // BUT throttled by how fast harvesters can supply crops to inventory
-        const truckIncomePerSec = state.trucks.reduce((sum, t) => {
-          const tc = TRUCK_CONFIG[t.type];
-          const tripTime = tc.deliveryTime / speedMult;
-          // Income per delivery
-          return sum + (tc.capacity * avgCropValue * tc.valueMultiplier * pm * marketBonus) / tripTime;
-        }, 0);
-
+        // Idle income (already bottlenecked + halved) shared with the Time
+        // Warp gem consumable so both stay consistent — and so gem perks like
+        // Golden Touch boost offline earnings too.
+        const idleRate = estimateIdleRatePerSec(state);
         const harvesterRatePerSec = state.harvesters.reduce((sum, h) => sum + HARVESTER_CONFIG[h.type].harvestRate, 0);
-        const supplyIncomePerSec = harvesterRatePerSec * avgCropValue * pm;
-
-        // Idle income capped at the bottleneck, then halved (offline is less efficient)
-        const idleRate = Math.min(truckIncomePerSec, supplyIncomePerSec) * 0.5;
         const moneyEarned = Math.floor(idleRate * cappedSec);
         const cropsGrown = Math.floor(harvesterRatePerSec * cappedSec * 0.5);
 
         set(s => ({
           money: s.money + moneyEarned,
           totalEarned: s.totalEarned + moneyEarned,
+          lifetimeEarned: (s.lifetimeEarned || 0) + moneyEarned,
           lastSavedTime: now,
           offlineReport: moneyEarned > 0 || cropsGrown > 0
             ? { seconds: cappedSec, moneyEarned, cropsGrown }
@@ -1176,6 +1369,7 @@ export const useGameStore = create<GameStore>()(
         money: s.money,
         gems: s.gems,
         totalEarned: s.totalEarned,
+        lifetimeEarned: s.lifetimeEarned,
         prestigeLevel: s.prestigeLevel,
         fields: s.fields,
         harvesters: s.harvesters,
@@ -1184,6 +1378,7 @@ export const useGameStore = create<GameStore>()(
         inventory: s.inventory,
         unlockedCrops: s.unlockedCrops,
         upgrades: s.upgrades,
+        gemPerks: s.gemPerks,
         fieldCarts: s.fieldCarts,
         marketOrders: s.marketOrders,
         achievements: s.achievements,

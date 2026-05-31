@@ -1,5 +1,5 @@
 import { useGameStore } from '../store';
-import { PRESTIGE_CONFIG } from '../config';
+import { PRESTIGE_CONFIG, getPrestigeConfig } from '../config';
 import { formatMoney } from '../utils/format';
 
 export default function PrestigeView() {
@@ -14,8 +14,16 @@ export default function PrestigeView() {
   const warehouseCount = useGameStore(s => s.warehouses.length);
   const money = useGameStore(s => s.money);
 
-  const nextPrestige = PRESTIGE_CONFIG[prestigeLevel];
-  const canPrestige = nextPrestige && totalEarned >= nextPrestige.requirement;
+  // Prestige is now infinite — there's always a next tier (named milestones
+  // for the first three, then generated "Tycoon Tier" levels forever).
+  const current = getPrestigeConfig(prestigeLevel);
+  const nextPrestige = getPrestigeConfig(prestigeLevel + 1);
+  const canPrestige = !!nextPrestige && totalEarned >= nextPrestige.requirement;
+
+  // Overview shows the three named tiers plus the next couple of generated
+  // tiers so the player can see the ladder keeps going.
+  const maxTier = Math.max(PRESTIGE_CONFIG.length, prestigeLevel + 2);
+  const overviewTiers = Array.from({ length: maxTier }, (_, i) => getPrestigeConfig(i + 1)!).filter(Boolean);
 
   return (
     <div className="tab-content p-4 pb-24">
@@ -25,13 +33,13 @@ export default function PrestigeView() {
       </p>
 
       {/* Current prestige status */}
-      {prestigeLevel > 0 && (
+      {prestigeLevel > 0 && current && (
         <div className="bg-yellow-900/20 border border-yellow-700 rounded-2xl p-4 mb-4">
           <div className="text-yellow-400 font-bold text-lg">
-            {PRESTIGE_CONFIG[prestigeLevel - 1].emoji} {PRESTIGE_CONFIG[prestigeLevel - 1].name}
+            {current.emoji} {current.name}
           </div>
           <div className="text-yellow-300 text-sm mt-1">
-            Active: {PRESTIGE_CONFIG[prestigeLevel - 1].multiplier}× income multiplier
+            Active: {current.multiplier}× income multiplier
           </div>
         </div>
       )}
@@ -114,9 +122,9 @@ export default function PrestigeView() {
       )}
 
       {/* All prestige levels overview */}
-      <h3 className="text-slate-400 text-xs uppercase tracking-wider mb-3 mt-2">All Prestige Levels</h3>
+      <h3 className="text-slate-400 text-xs uppercase tracking-wider mb-3 mt-2">Prestige Ladder</h3>
       <div className="flex flex-col gap-2">
-        {PRESTIGE_CONFIG.map(cfg => {
+        {overviewTiers.map(cfg => {
           const done = prestigeLevel >= cfg.level;
           const isNext = prestigeLevel === cfg.level - 1;
           return (

@@ -54,6 +54,28 @@ export function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () 
             {fillPct > 0.9 && <p style={{ color: '#f87171', fontSize: 10, marginTop: 4 }}>⚠️ Almost full! Buy more storage in Shop.</p>}
           </div>
 
+          {/* Sell All — placed right below capacity (per player feedback) so
+              it's the first action you see, not buried under the lists. */}
+          {entries.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <button
+                onClick={() => { sellInventory(); onClose(); }}
+                style={{
+                  width: '100%', padding: '14px',
+                  background: 'linear-gradient(135deg,#d97706,#b45309)',
+                  color: 'white', border: 'none',
+                  borderRadius: 14, fontWeight: 800,
+                  fontSize: 15, cursor: 'pointer',
+                }}
+              >
+                Sell All — {formatMoney(Math.floor(sellValue))}
+              </button>
+              <p style={{ color: '#475569', fontSize: 10, textAlign: 'center', marginTop: 6 }}>
+                💡 Trucks deliver for up to 1.8× more income
+              </p>
+            </div>
+          )}
+
           {/* Warehouses list */}
           <p style={{ color: '#475569', fontSize: 11, marginBottom: 6 }}>YOUR BUILDINGS</p>
           {warehouses.map(w => {
@@ -107,27 +129,6 @@ export function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () 
               })}
             </div>
           )}
-
-          {/* Sell button */}
-          {entries.length > 0 && (
-            <div style={{ marginTop: 14 }}>
-              <button
-                onClick={() => { sellInventory(); onClose(); }}
-                style={{
-                  width: '100%', padding: '14px',
-                  background: 'linear-gradient(135deg,#d97706,#b45309)',
-                  color: 'white', border: 'none',
-                  borderRadius: 14, fontWeight: 800,
-                  fontSize: 15, cursor: 'pointer',
-                }}
-              >
-                Sell All — {formatMoney(Math.floor(sellValue))}
-              </button>
-              <p style={{ color: '#475569', fontSize: 10, textAlign: 'center', marginTop: 6 }}>
-                💡 Trucks deliver for up to 1.8× more income
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </>
@@ -136,7 +137,8 @@ export function WarehouseDrawer({ open, onClose }: { open: boolean; onClose: () 
 
 // ── Market panel ──────────────────────────────────────────────────────────────
 export function MarketDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const totalEarned = useGameStore(s => s.totalEarned);
+  // Lifetime earnings (never resets on prestige); legacy saves fall back to totalEarned.
+  const totalEarned = useGameStore(s => s.lifetimeEarned || s.totalEarned);
   const prestigeLevel = useGameStore(s => s.prestigeLevel);
   const gems = useGameStore(s => s.gems ?? 0);
 
@@ -362,11 +364,17 @@ export function AssignDrawer({
   const tendField = useGameStore(s => s.tendField);
   const fixFieldIssue = useGameStore(s => s.fixFieldIssue);
   const sellField = useGameStore(s => s.sellField);
+  const upgradeField = useGameStore(s => s.upgradeField);
   const unlockedCrops = useGameStore(s => s.unlockedCrops);
   const addToast = useGameStore(s => s.addToast);
 
   const field = fields.find(f => f.id === fieldId);
   if (!field) return null;
+
+  // Next field size tier (if any) for the in-place upgrade button.
+  const FIELD_ORDER = ['starter', 'small', 'medium', 'large', 'industrial'] as const;
+  const nextTier = FIELD_ORDER[FIELD_ORDER.indexOf(field.type as typeof FIELD_ORDER[number]) + 1];
+  const nextCfg = nextTier ? FIELD_CONFIG[nextTier] : null;
 
   const unassigned = harvesters.filter(h => h.fieldId === null);
   const assigned = harvesters.find(h => h.fieldId === fieldId);
@@ -496,6 +504,27 @@ export function AssignDrawer({
             <div style={{ color: '#475569', fontSize: 12, textAlign: 'center', padding: '16px 0' }}>
               No harvesters available. Buy one in the Shop!
             </div>
+          )}
+
+          {/* Upgrade field — grow this plot (including the starter homestead
+              plot) to the next size tier in place, keeping its crop. */}
+          {nextCfg && (
+            <button
+              onClick={() => { upgradeField(field.id); }}
+              style={{
+                width: '100%', padding: '12px', marginTop: 18,
+                background: 'linear-gradient(135deg,#15803d,#166534)',
+                color: '#dcfce7', border: '1.5px solid #22c55e',
+                borderRadius: 12, fontWeight: 800, fontSize: 13, cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+              }}
+            >
+              <span>⬆️ Upgrade to {nextCfg.name} — {formatMoney(nextCfg.price)}</span>
+              <span style={{ fontSize: 10, color: '#86efac', fontWeight: 600 }}>
+                {FIELD_CONFIG[field.type].capacity} → {nextCfg.capacity} capacity
+                {nextCfg.prestigeRequired > 0 ? ` · Prestige ${nextCfg.prestigeRequired}` : ''}
+              </span>
+            </button>
           )}
 
           {/* Sell field — only for non-starter fields. Shows the refund up

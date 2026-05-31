@@ -95,14 +95,29 @@ h1, h2, h3 {
      edges of the playable area. The sky gradient sits on top of the grass
      and only fades in for the top ~14% of the screen. */
   background-image:
+    /* sky band along the horizon */
     linear-gradient(180deg,
       #8fd7ff 0%,
       #bdeeff 7%,
       rgba(189, 238, 255, 0.65) 11%,
-      transparent 14%),
+      transparent 15%),
+    /* warm sunlight pooling out from the sun in the top-right */
+    radial-gradient(80% 62% at 82% 2%,
+      rgba(255, 246, 209, 0.42) 0%,
+      rgba(255, 233, 170, 0.14) 30%,
+      transparent 58%),
+    /* depth: shaded & cooler toward the far horizon, warm sunlit
+       tint toward the player at the bottom — kills the flat look */
+    linear-gradient(180deg,
+      rgba(16, 50, 27, 0.22) 0%,
+      rgba(16, 50, 27, 0.06) 14%,
+      transparent 40%,
+      transparent 66%,
+      rgba(250, 226, 150, 0.10) 100%),
+    /* base grass texture */
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='30' height='30'><rect width='30' height='30' fill='%2366bf62'/><path d='M2 23 Q8 17 15 23 T29 23' fill='none' stroke='rgba(255,255,255,0.09)' stroke-width='1'/><path d='M5 9 q3,-4 6,0 M20 15 q3,-4 6,0' stroke='%233f9c43' stroke-width='1.2' fill='none' stroke-linecap='round' opacity='0.42'/><circle cx='8' cy='8' r='1.2' fill='rgba(255,255,255,0.13)'/><circle cx='22' cy='17' r='1' fill='rgba(0,0,0,0.045)'/></svg>");
-  background-repeat: no-repeat, repeat;
-  background-size: 100% 100%, 30px 30px;
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat;
+  background-size: 100% 100%, 100% 100%, 100% 100%, 30px 30px;
 }
 
 .world-map {
@@ -112,6 +127,25 @@ h1, h2, h3 {
   will-change: transform;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+}
+
+/* Static atmospheric overlay — a soft vignette that darkens the edges
+   and corners so the farm reads with depth instead of looking like a
+   flat sprite sheet. Painted once (no animation), pointer-events off so
+   it never intercepts taps. Sits above the world but below HUD/labels. */
+.world-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(135% 105% at 50% 38%,
+      transparent 50%,
+      rgba(20, 14, 36, 0.10) 74%,
+      rgba(14, 9, 26, 0.30) 100%),
+    radial-gradient(70% 48% at 50% 8%,
+      rgba(255, 247, 219, 0.12) 0%,
+      transparent 60%);
 }
 
 .atmosphere-layer {
@@ -711,4 +745,9 @@ h1, h2, h3 {
 
 .hud-money.pop {
   animation: hud-money-pop 0.4s ease-out;
+}
+
+@keyframes field-alert-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 4px 10px rgba(185,28,28,0.5); }
+  50%      { transform: scale(1.08); box-shadow: 0 6px 16px rgba(239,68,68,0.75); }
 }
